@@ -23,7 +23,7 @@ Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premiu
    O `mod_rewrite` do Apache (já ativo no XAMPP) é necessário.
 3. Importe o banco — primeiro a estrutura, depois os dados de demonstração:
    - phpMyAdmin → Importar → `database/schema.sql` e depois `database/seed.sql`; **ou**
-   - no terminal, dentro da pasta do projeto:
+   - no **Prompt de Comando (cmd)**, dentro da pasta do projeto (no PowerShell o `<` não funciona):
      ```
      C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < database\schema.sql
      C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < database\seed.sql
