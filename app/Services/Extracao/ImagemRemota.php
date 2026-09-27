@@ -8,7 +8,8 @@ declare(strict_types=1);
  *    se a ficha veio sem imagem (ou com link ruim), usa a imagem de divulgação da página do conteúdo
  *    (og:image — a mesma que aparece quando o link é compartilhado);
  *  - baixar(): no cadastro, baixa as imagens escolhidas, reduz para no máximo 800 px de largura e grava
- *    em storage/uploads, como as imagens enviadas pelo painel.
+ *    em storage/uploads, como as imagens enviadas pelo painel;
+ *  - pdfs(): baixa o PDF dos e-books (do link direto ou achado na página) para a BIBLIOTECA da plataforma.
  *
  * As buscas saem ao mesmo tempo (curl_multi), com tempo e tamanho limitados.
  * Segurança: só http/https e só servidores públicos — nada de localhost ou rede interna. O HTTPS é sempre
@@ -62,6 +63,129 @@ final class ImagemRemota {
         $out = [];
         foreach (self::buscar($urls, self::LIMITE_IMAGEM, false) as $u => [$bytes]) {
             if (self::ehImagem($bytes) && ($caminho = self::gravar($bytes, $prefixo)) !== '') $out[$u] = $caminho;
+        }
+        return $out;
+    }
+
+    /**
+     * PDF dos e-books para a BIBLIOTECA da plataforma (o botão do conteúdo vira "Baixar").
+     * O link pode ser o próprio PDF ou a página do e-book: na página, procura o PDF (metatag citation_pdf_url
+     * dos repositórios como o eduCAPES, ou o link "baixar/download/.pdf"). Só PDF de verdade e completo, até
+     * MAX_PDF_REMOTO; grava em storage/uploads/biblioteca_*.pdf.
+     * @param string[] $urls
+     * @return array<string,string> link => 'assets/uploads/biblioteca_...pdf' (só os que deram certo)
+     */
+    public static function pdfs(array $urls): array {
+        $urls = array_values(array_unique(array_filter($urls, fn($u) => is_string($u) && $u !== '')));
+        $out = []; $paginas = [];
+        $arquivos = self::baixarArquivos($urls, MAX_PDF_REMOTO);
+        foreach ($urls as $u) {
+            [$tmp, $tipo, $final] = $arquivos[$u] ?? ['', '', $u];
+            if ($tmp === '') continue;
+            if (self::ehPdf($tmp)) { if (($c = self::guardarPdf($tmp)) !== '') $out[$u] = $c; }
+            elseif (str_contains($tipo, 'html') && filesize($tmp) <= 3 * 1024 * 1024 && ($p = self::pdfDaPagina((string)file_get_contents($tmp), $final)) !== '') $paginas[$u] = $p;
+            if (is_file($tmp)) @unlink($tmp);
+        }
+        if ($paginas) {
+            $arquivos = self::baixarArquivos(array_values($paginas), MAX_PDF_REMOTO);
+            foreach ($paginas as $u => $p) {
+                $tmp = $arquivos[$p][0] ?? '';
+                if ($tmp !== '' && self::ehPdf($tmp) && ($c = self::guardarPdf($tmp)) !== '') $out[$u] = $c;
+                if ($tmp !== '' && is_file($tmp)) @unlink($tmp);
+            }
+        }
+        return $out;
+    }
+
+    /** O PDF que a página do e-book oferece: metatag citation_pdf_url ou o melhor link para ".pdf". '' se não houver. */
+    public static function pdfDaPagina(string $html, string $base): string {
+        if (preg_match('/<meta[^>]+name=["\']citation_pdf_url["\'][^>]*content=["\']([^"\']+)/i', $html, $m)
+            || preg_match('/<meta[^>]+content=["\']([^"\']+)["\'][^>]*name=["\']citation_pdf_url["\']/i', $html, $m)) {
+            $u = self::absoluto(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5), $base);
+            if ($u !== '') return $u;
+        }
+        $melhor = ''; $pontos = -1;
+        preg_match_all('/<a\b[^>]*\bhref=["\']([^"\'#]+\.pdf(?:[?#][^"\']*)?)["\'][^>]*>(.*?)<\/a>/is', $html, $ms, PREG_SET_ORDER);
+        foreach ($ms as [, $href, $texto]) {
+            $u = self::absoluto(html_entity_decode($href, ENT_QUOTES | ENT_HTML5), $base);
+            if ($u === '') continue;
+            // Link de baixar o e-book vale mais que um PDF qualquer da página (edital, termo de uso).
+            // (o ".pdf" do endereço não conta: todo candidato tem)
+            $p = preg_match('/baixar|download|e-?book|cartilha|guia|manual|livro|apostila/i', strip_tags($texto).' '.preg_replace('/\.pdf.*$/i', '', $href)) ? 2 : 1;
+            if ($p > $pontos) { $pontos = $p; $melhor = $u; }
+        }
+        return $melhor;
+    }
+
+    /** PDF de verdade e inteiro (o leitor de arquivos reconhece como PDF e o fim "%%EOF" chegou). */
+    private static function ehPdf(string $arquivo): bool {
+        if (!is_file($arquivo) || filesize($arquivo) < 1024) return false;
+        if (((new finfo(FILEINFO_MIME_TYPE))->file($arquivo) ?: '') !== 'application/pdf') return false;
+        $f = fopen($arquivo, 'rb');
+        if (!$f) return false;
+        fseek($f, -min(8192, filesize($arquivo)), SEEK_END);
+        $fim = (string)fread($f, 8192);
+        fclose($f);
+        return str_contains($fim, '%%EOF');
+    }
+
+    /** Move o PDF baixado para a biblioteca (storage/uploads/biblioteca_*.pdf, nome aleatório). */
+    private static function guardarPdf(string $tmp): string {
+        $nome = 'biblioteca_'.date('YmdHis').'_'.bin2hex(random_bytes(5)).'.pdf';
+        if (!@rename($tmp, UPLOAD_DIR.$nome)) {
+            if (!@copy($tmp, UPLOAD_DIR.$nome)) return '';
+            @unlink($tmp);
+        }
+        return 'assets/uploads/'.$nome;
+    }
+
+    /**
+     * Baixa arquivos grandes direto para o disco (sem guardar tudo na memória), 6 por vez, até $limite bytes e
+     * 180 s cada. Mesmas travas do buscar(): só http/https, só servidor público (inclusive depois dos redirecionamentos).
+     * @return array<string,array{0:string,1:string,2:string}> link => [arquivo temporário, content-type, endereço final]
+     */
+    private static function baixarArquivos(array $urls, int $limite): array {
+        if (!function_exists('curl_multi_init')) return [];
+        $urls = array_values(array_unique(array_filter($urls, fn($u) => $u !== '' && self::linkPublico($u))));
+        $out = [];
+        foreach (array_chunk($urls, 6) as $grupo) {
+            $mh = curl_multi_init();
+            $hs = []; $arqs = []; $fps = []; $tamanhos = [];
+            foreach ($grupo as $u) {
+                $arqs[$u] = (string)tempnam(sys_get_temp_dir(), 'cvdf_pdf_');
+                $fps[$u] = fopen($arqs[$u], 'wb');
+                $tamanhos[$u] = 0;
+                $ch = curl_init($u);
+                if (is_file(self::CERTIFICADOS)) curl_setopt($ch, CURLOPT_CAINFO, self::CERTIFICADOS);
+                curl_setopt_array($ch, [
+                    CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 5,
+                    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                    CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_TIMEOUT => 180, CURLOPT_ENCODING => '',
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36',
+                    CURLOPT_HTTPHEADER => ['Accept-Language: pt-BR,pt;q=0.9'],
+                    CURLOPT_WRITEFUNCTION => function ($ch, string $parte) use (&$fps, &$tamanhos, $u, $limite): int {
+                        $tamanhos[$u] += strlen($parte);
+                        if ($tamanhos[$u] > $limite) return 0;   // grande demais: para de baixar
+                        return (int)fwrite($fps[$u], $parte);
+                    },
+                ]);
+                curl_multi_add_handle($mh, $ch);
+                $hs[$u] = $ch;
+            }
+            do {
+                $estado = curl_multi_exec($mh, $ativos);
+                if ($ativos) curl_multi_select($mh, 1.0);
+            } while ($ativos && $estado === CURLM_OK);
+            foreach ($hs as $u => $ch) {
+                fclose($fps[$u]);
+                $ok = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE) === 200 && $tamanhos[$u] <= $limite && curl_errno($ch) === 0
+                    && self::ipPublico((string)curl_getinfo($ch, CURLINFO_PRIMARY_IP));
+                if ($ok) $out[$u] = [$arqs[$u], strtolower((string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE)), (string)curl_getinfo($ch, CURLINFO_EFFECTIVE_URL)];
+                else @unlink($arqs[$u]);
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+            }
+            curl_multi_close($mh);
         }
         return $out;
     }

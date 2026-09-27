@@ -43,6 +43,7 @@ Gratuito: Sim | Não
 Preço: ex.: R\$ 49,90 (só se não for gratuito)
 Área: uma destas: {$listaAreas}
 Link: endereço oficial completo, começando com https://
+PDF: (só e-book gratuito) endereço DIRETO do arquivo PDF oficial, terminando em .pdf (ou Não encontrado)
 Imagem: endereço direto da imagem da capa (e-book) ou da imagem do curso, começando com https://
 Descrição: 1 ou 2 frases dizendo o que a pessoa aprende e se tem certificado
 ---
@@ -58,6 +59,7 @@ TXT;
 REGRAS DE PESQUISA:
 1. Abra a página OFICIAL de cada item (site da instituição) antes de responder. Nunca invente link, carga horária, preço ou imagem: o que não achar, escreva Não informado (na imagem: Não encontrada).
 2. Link: o endereço oficial da página do próprio curso/e-book (para e-book, pode ser o PDF oficial). Nada de página inicial, resultado de busca ou site que copia conteúdo.
+   PDF (e-book gratuito): o link DIRETO do arquivo no site oficial (o que baixa o PDF, terminando em .pdf) — a plataforma guarda esse PDF na biblioteca dela. Nunca de site que copia conteúdo; livro pago não tem PDF.
 3. Imagem: endereço DIRETO de uma imagem oficial do item, terminando em .jpg, .jpeg, .png ou .webp — no e-book, a CAPA; no curso, a imagem de divulgação da página. Nunca logotipo genérico, ícone ou imagem de outro site. Não achou? Escreva Não encontrada (o cadastro entra com a imagem padrão da plataforma).
 4. Fontes oficiais preferidas: {$fontes}. Outras instituições públicas ou reconhecidas valem se o link for do site oficial delas.
 5. Tudo em português. Descrição curta e objetiva, sem propaganda. Diga se tem certificado. Área: escolha a mais próxima da lista (nunca invente uma área nova).

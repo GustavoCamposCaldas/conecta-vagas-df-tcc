@@ -63,6 +63,14 @@ final class CursoDAO {
     }
 
     /** Publicar (1) ou ocultar (0) com um clique. false = conteúdo não existe. */
+    /** E-book passa a abrir o PDF da BIBLIOTECA (botão "Baixar"); a descrição ganha a fonte original. */
+    public function guardarNaBiblioteca(int $id, string $pdf, string $descricao): bool {
+        if (!eh_pdf_biblioteca($pdf)) return false;
+        $s = Database::getConexao()->prepare("UPDATE cursos SET url=?, descricao=? WHERE id=? AND tipo='ebook'");
+        $s->execute([$pdf, $descricao, $id]);
+        return $s->rowCount() > 0;
+    }
+
     public function alterarAtivo(int $id, bool $ativo): bool {
         if (!$this->buscar($id)) return false;
         Database::getConexao()->prepare("UPDATE cursos SET ativo=? WHERE id=?")->execute([$ativo ? 1 : 0, $id]);

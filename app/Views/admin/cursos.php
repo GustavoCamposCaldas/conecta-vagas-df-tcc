@@ -9,7 +9,7 @@
 $novoRotulo = ['curso' => 'Novo curso', 'ebook' => 'Novo e-book', 'video' => 'Novo vídeo'];
 $botoesNovo = '';
 foreach ($novoRotulo as $t => $r) $botoesNovo .= '<a class="btn btn-sm'.($t === 'curso' ? '' : ' btn-outline').'" href="'.e(url('admin/pages/cursos.php').painel_qs(['novo' => $t])).'#form-curso">+ '.e($r).'</a>';
-$modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\nCarga horária:\nGratuito:\nPreço:\nÁrea:\nLink: https://...\nImagem: https://...\nDescrição:";
+$modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\nCarga horária:\nGratuito:\nPreço:\nÁrea:\nLink: https://...\nPDF: https://... (e-book gratuito: link direto do arquivo)\nImagem: https://...\nDescrição:";
 ?>
 <div class="pn">
 <?php require __DIR__.'/../layouts/admin_nav.php'; ?>
@@ -27,7 +27,7 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
             <?=carregador_html('Pronto: dados extraídos — revise abaixo e clique em "Salvar conteúdo".'.(($form['imagem_url'] ?? '') === '' && ($form['imagem'] ?? '') === '' ? ' Sem imagem na ficha: vai entrar com a imagem padrão (troque depois).' : ''), true)?>
         <?php endif; ?>
         <?php if ($importacao): ?>
-        <form method="post" class="imp-previa" style="margin-top:12px" data-carregando="Cadastrando os conteúdos e baixando as imagens…">
+        <form method="post" class="imp-previa" style="margin-top:12px" data-carregando="Cadastrando os conteúdos e baixando as imagens e os PDFs…">
             <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="importar_salvar">
             <div class="table-wrap"><table class="table">
                 <tr><th><span class="sr-only">Importar</span></th><th>Imagem</th><th>Título</th><th>Tipo</th><th>Instituição</th><th>Modalidade</th><th>Área</th><th>Link</th><th>Situação</th></tr>
@@ -40,11 +40,12 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
                     <td><?=e($it['instituicao'] ?: '—')?></td>
                     <td><?=e(rotulo($it['modalidade']))?><?=$it['gratuito'] ? '' : '<br><small class="meta">pago</small>'?></td>
                     <td><?=e($it['categoria'] ?: 'Sem categoria')?></td>
-                    <td class="meta"><?=$it['url'] !== '' ? '<a href="'.e($it['url']).'" target="_blank" rel="noopener">'.e(parse_url($it['url'], PHP_URL_HOST) ?: $it['url']).'<span class="sr-only"> (abre em nova aba)</span></a>' : '—'?></td>
+                    <td class="meta"><?=$it['url'] !== '' ? '<a href="'.e($it['url']).'" target="_blank" rel="noopener">'.e(parse_url($it['url'], PHP_URL_HOST) ?: $it['url']).'<span class="sr-only"> (abre em nova aba)</span></a>' : '—'?><?=$it['tipo'] === 'ebook' && (($it['pdf_url'] ?? '') !== '' || preg_match('/\.pdf($|[?#])/i', $it['url'])) ? '<br><small>PDF → biblioteca</small>' : ''?></td>
                     <td><?=$ruim ? painel_status('bloqueado', ucfirst(implode(', ', $it['problemas']))) : ($it['alerta'] !== '' ? painel_status('pausada', ucfirst($it['alerta'])) : painel_status('ativa', 'Pronto'))?></td>
                 </tr>
                 <?php endforeach; ?>
             </table></div>
+            <?php if (array_filter($importacao, fn($it) => $it['tipo'] === 'ebook')): ?><div class="check"><input type="checkbox" name="pdfs_biblioteca" value="1" id="imp-pdfs" checked><label for="imp-pdfs">Guardar na nossa biblioteca o PDF dos e-books (o botão vira "Baixar")</label></div><?php endif; ?>
             <div class="form-actions"><button class="btn">Cadastrar marcados</button>
                 <button class="btn btn-outline" name="acao" value="importar_cancelar" formnovalidate>Descartar prévia</button></div>
         </form>
@@ -64,7 +65,10 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
             <div><label for="c-nivel">Nível</label><select id="c-nivel" name="nivel"><?php foreach (CursoDAO::NIVEIS as $x): ?><option value="<?=$x?>" <?=$form['nivel'] === $x ? 'selected' : ''?>><?=e(rotulo($x))?></option><?php endforeach; ?></select></div>
             <div><label for="c-dur">Duração / carga horária</label><input id="c-dur" name="duracao" maxlength="50" value="<?=e($form['duracao'])?>" placeholder="Ex.: 12 horas"></div>
             <div><label for="c-preco">Preço (se pago)</label><input id="c-preco" name="preco" inputmode="decimal" value="<?=e($form['preco'] !== null && $form['preco'] !== '' ? number_format((float)$form['preco'], 2, ',', '.') : '')?>" placeholder="Ex.: 49,90"></div>
-            <div class="full"><label for="c-url">Link oficial (página na web → botão "Acessar")</label><input id="c-url" name="url" type="text" inputmode="url" maxlength="500" value="<?=e($form['url'])?>" placeholder="https://"></div>
+            <div class="full"><label for="c-url">Link oficial (página ou PDF na web → botão "Acessar")</label><input id="c-url" name="url" type="text" inputmode="url" maxlength="500" value="<?=e($form['url'])?>" placeholder="https://"></div>
+            <?php $naBiblioteca = eh_pdf_biblioteca((string)$form['url']); ?>
+            <div class="full"><label for="c-pdf-url">Link direto do PDF (opcional: se ficar vazio, o PDF é procurado no link oficial)</label><input id="c-pdf-url" name="pdf_url" type="url" maxlength="500" value="<?=e((string)($form['pdf_url'] ?? ''))?>" placeholder="https://.../ebook.pdf">
+                <div class="check" style="margin-top:8px"><input type="checkbox" name="pdf_biblioteca" value="1" id="pdf-bib" <?=!$naBiblioteca && $form['tipo'] === 'ebook' ? 'checked' : ''?>><label for="pdf-bib">Guardar o PDF na nossa biblioteca ao salvar: o sistema baixa o PDF (do link direto ou achado na página) e o botão vira "Baixar". Use com e-books gratuitos.</label></div></div>
             <div class="full"><label for="c-pdf">…ou envie o PDF para a nossa biblioteca (o botão vira "Baixar"; até <?=(int)(MAX_PDF_BIBLIOTECA / 1024 / 1024)?> MB)</label>
                 <input id="c-pdf" type="file" name="arquivo_pdf" accept="application/pdf">
                 <?php if (eh_pdf_biblioteca((string)$form['url'])): ?><small class="meta">Este conteúdo já está na biblioteca: <a href="<?=e(url($form['url']))?>" target="_blank" rel="noopener">abrir o PDF<span class="sr-only"> (abre em nova aba)</span></a>. Enviar outro substitui.</small><?php endif; ?></div>
@@ -82,6 +86,13 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
 </div>
 
 <div class="pn-contagem" id="lista-cursos"><h2>Conteúdos cadastrados</h2><span><?=gf_num($totalLista)?> <?=gf_plural($totalLista, 'conteúdo', 'conteúdos')?><?=$paginas > 1 ? ' · página '.$pagina.' de '.$paginas : ''?><?=$filtroTipo !== '' || $comFiltro ? ' · <a href="'.e(url('admin/pages/cursos.php')).'#lista-cursos">limpar filtros</a>' : ''?></span></div>
+<?php if ($ebooksNaWeb): ?>
+<form method="post" class="pn-biblioteca" data-carregando="Baixando os PDFs dos e-books para a biblioteca… (pode levar alguns minutos)">
+    <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="pdfs_biblioteca">
+    <p><b><?=gf_num($ebooksNaWeb)?> <?=gf_plural($ebooksNaWeb, 'e-book', 'e-books')?></b> ainda <?=$ebooksNaWeb === 1 ? 'abre' : 'abrem'?> o PDF no site de origem (botão "Acessar"). Traga para a nossa biblioteca e o botão vira "Baixar".</p>
+    <div class="form-actions"><button class="btn btn-sm">Trazer os PDFs para a biblioteca</button></div>
+</form>
+<?php endif; ?>
 <?=painel_subabas('tipo', $filtroTipo, ['' => ['Todos', array_sum($porTipo)], 'curso' => ['Cursos', $porTipo['curso'] ?? 0], 'ebook' => ['E-books', $porTipo['ebook'] ?? 0], 'video' => ['Vídeos', $porTipo['video'] ?? 0]], 'Formato')?>
 <form class="filtros" method="get" action="#lista-cursos" style="grid-template-columns:2fr 1fr 1fr auto">
     <?php if ($filtroTipo !== ''): ?><input type="hidden" name="tipo" value="<?=e($filtroTipo)?>"><?php endif; ?>
@@ -97,7 +108,7 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
     <tr>
         <td class="pn-td-img"><?=painel_miniatura((string)$x['imagem'], $x['tipo'] === 'ebook' ? 'ebook' : '', pt_secao_formato((string)$x['tipo'])[2])?></td>
         <td class="quebra"><?=e($x['titulo'])?><br><small class="meta">#<?=(int)$x['id']?><?=$x['duracao'] ? ' · '.e($x['duracao']) : ''?> · <?=e(pt_preco($x))?></small></td>
-        <td><?=e(rotulo($x['tipo']))?></td><td><?=e($x['categoria_nome'] ?? '—')?></td><td class="quebra"><?=e($x['instituicao'] ?? '')?></td>
+        <td><?=e(rotulo($x['tipo']))?><?php if ($x['tipo'] === 'ebook'): ?><br><small class="meta"><?=eh_pdf_biblioteca((string)$x['url']) ? 'PDF na biblioteca' : 'link da web'?></small><?php endif; ?></td><td><?=e($x['categoria_nome'] ?? '—')?></td><td class="quebra"><?=e($x['instituicao'] ?? '')?></td>
         <td><?=painel_chave((bool)$x['ativo'], 'ativar', 'desativar', (int)$x['id'], 'Publicado', 'Oculto', '', (string)$x['titulo'])?><?php if (CursoDAO::ehImagemPadrao((string)$x['imagem'])): ?><br><a class="pn-trocar-img" href="<?=e(painel_qs(['edit' => (int)$x['id']]))?>#form-curso">trocar imagem</a><?php endif; ?></td>
         <td class="meta"><?=$x['created_at'] ? date('d/m/Y', strtotime((string)$x['created_at'])) : '—'?></td>
         <td><?=painel_botoes([

@@ -276,6 +276,24 @@ final class AdminController extends Controller {
                 redirect('admin/pages/cursos.php'.painel_qs());
             }
 
+            // BIBLIOTECA: traz para a plataforma o PDF de todo e-book que ainda abre no site de origem ("Acessar" → "Baixar").
+            if ($acao === 'pdfs_biblioteca') {
+                set_time_limit(900);
+                $naWeb = array_values(array_filter($dao->listar(false), fn($c) => $c['tipo'] === 'ebook' && url_http_valida((string)$c['url'])));
+                $pdfs = ImagemRemota::pdfs(array_column($naWeb, 'url'));
+                $ok = 0;
+                foreach ($naWeb as $c) {
+                    $p = $pdfs[$c['url']] ?? '';
+                    if ($p === '') continue;
+                    if ($dao->guardarNaBiblioteca((int)$c['id'], $p, self::comFonte((string)$c['descricao'], (string)$c['url']))) $ok++;
+                    else apagar_upload_sem_uso($p);
+                }
+                $falta = count($naWeb) - $ok;
+                flash($ok ? 'ok' : 'erro', ($ok ? "{$ok} PDF(s) guardado(s) na biblioteca: o botão desses e-books agora é \"Baixar\"." : 'Nenhum PDF foi baixado.')
+                    .($falta ? " {$falta} e-book(s) continuam com \"Acessar\" (o link não levou a um PDF público; envie o arquivo em Editar)." : ''));
+                redirect('admin/pages/cursos.php'.painel_qs(['tipo' => 'ebook']).'#lista-cursos');
+            }
+
             // Várias fichas coladas: cadastra as marcadas na prévia.
             if ($acao === 'importar_salvar') {
                 set_time_limit(300);   // baixa as imagens
@@ -290,6 +308,10 @@ final class AdminController extends Controller {
                 }
                 // Imagem: a da ficha/página (baixada para storage/uploads); sem ela, o banner da instituição ou a imagem padrão.
                 $baixadas = ImagemRemota::baixar(array_map(fn($it) => (string)($it['imagem_url'] ?? ''), $validos), 'curso');
+                // E-books: o PDF (do campo "PDF:" da ficha ou do link) vai para a BIBLIOTECA, se a opção ficou marcada na prévia.
+                $fontePdf = fn(array $it) => (string)(($it['pdf_url'] ?? '') ?: $it['url']);
+                $pdfs = isset($_POST['pdfs_biblioteca']) ? ImagemRemota::pdfs(array_map($fontePdf, array_filter($validos, fn($it) => $it['tipo'] === 'ebook'))) : [];
+                $naBiblioteca = 0;
                 $ok = 0; $comPadrao = 0; $pulados = count($marcados) - count($validos);
                 foreach ($validos as $it) {
                     if ($dao->buscarRepetido($it['url'], $it['titulo'], $it['instituicao'])) { $pulados++; continue; }   // repetido dentro do próprio lote
@@ -304,11 +326,12 @@ final class AdminController extends Controller {
                         'imagem' => $imagem, 'instituicao' => mb_substr((string)$it['instituicao'], 0, 255), 'ativo' => 1,
                     ];
                     if (!$d['gratuito'] && ($d['preco'] === null || $d['preco'] <= 0)) { $d['gratuito'] = 1; $d['preco'] = null; } // pago sem preço: publica como gratuito para revisar
-                    $dao->salvar($d) ? $ok++ : $pulados++;
+                    if ($tipo === 'ebook' && ($pdf = $pdfs[$fontePdf($it)] ?? '') !== '') { $d['descricao'] = self::comFonte($d['descricao'], $d['url']); $d['url'] = $pdf; }
+                    if ($dao->salvar($d)) { $ok++; if (eh_pdf_biblioteca($d['url'])) $naBiblioteca++; } else $pulados++;
                 }
-                foreach ($baixadas as $img) apagar_upload_sem_uso($img);   // imagem baixada de item que acabou não entrando
+                foreach (array_merge(array_values($baixadas), array_values($pdfs)) as $arq) apagar_upload_sem_uso($arq);   // imagem/PDF baixado de item que acabou não entrando
                 unset($_SESSION['import_cursos']);
-                flash($ok ? 'ok' : 'erro', $ok ? "{$ok} conteúdo(s) cadastrado(s) e publicado(s)".($comPadrao ? "; {$comPadrao} com a imagem padrão (troque depois em Editar)" : '').($pulados ? "; {$pulados} pulado(s) (sem link, sem título ou repetido)." : '.') : 'Nenhum conteúdo cadastrado. Marque as fichas que quer importar.');
+                flash($ok ? 'ok' : 'erro', $ok ? "{$ok} conteúdo(s) cadastrado(s) e publicado(s)".($naBiblioteca ? "; {$naBiblioteca} com o PDF na biblioteca (botão \"Baixar\")" : '').($comPadrao ? "; {$comPadrao} com a imagem padrão (troque depois em Editar)" : '').($pulados ? "; {$pulados} pulado(s) (sem link, sem título ou repetido)." : '.') : 'Nenhum conteúdo cadastrado. Marque as fichas que quer importar.');
                 redirect('admin/pages/cursos.php');
             }
             if ($acao === 'importar_cancelar') { unset($_SESSION['import_cursos']); redirect('admin/pages/cursos.php'); }
@@ -384,6 +407,27 @@ final class AdminController extends Controller {
                 $img = salvar_imagem_enviada('imagem_arquivo', 'curso');
                 if ($img === false) $erros[] = 'Imagem inválida (use JPG, PNG ou WEBP até 3 MB).';
                 elseif ($img !== null) $d['imagem'] = $img;
+                // PDF da WEB para a BIBLIOTECA ("Guardar o PDF na biblioteca" marcado e nenhum arquivo enviado): baixa o PDF
+                // do campo "Link direto do PDF", ou do link oficial (se for a página, acha o PDF nela). Sem PDF, fica "Acessar".
+                $pdfLink = mb_substr(post_str('pdf_url'), 0, 500);
+                if ($pdfLink !== '' && !url_http_valida($pdfLink)) $erros[] = 'O link do PDF precisa começar com http:// ou https://.';
+                $avisoPdf = ''; $doLink = ''; $urlWeb = $d['url'];
+                if (!$erros && $pdf === null && isset($_POST['pdf_biblioteca']) && !eh_pdf_biblioteca($d['url'])) {
+                    $fonte = $pdfLink !== '' ? $pdfLink : $d['url'];
+                    if (url_http_valida($fonte)) {
+                        set_time_limit(300);
+                        $doLink = ImagemRemota::pdfs([$fonte])[$fonte] ?? '';
+                        if ($doLink !== '') {
+                            $pdf = $doLink;
+                            $d['descricao'] = self::comFonte($d['descricao'], $d['url'] !== '' ? $d['url'] : $fonte);
+                            $d['url'] = $doLink;
+                            $avisoPdf = ' PDF guardado na biblioteca: o botão agora é "Baixar".';
+                        } else {
+                            if ($d['url'] === '') $d['url'] = $fonte;
+                            $avisoPdf = ' Não achei um PDF público no link: ficou com o botão "Acessar" (para guardar na biblioteca, envie o arquivo).';
+                        }
+                    }
+                }
                 // Imagem por LINK (ex.: a que veio na ficha): baixada para storage/uploads só ao salvar,
                 // e só quando não veio arquivo nem caminho.
                 $imgLink = mb_substr(post_str('imagem_url'), 0, 500);
@@ -403,10 +447,10 @@ final class AdminController extends Controller {
                 }
                 if ($erros) {
                     if ($img) { apagar_upload_sem_uso($img); $d['imagem'] = $existente['imagem'] ?? ''; } // não deixa arquivo órfão
-                    if (is_string($pdf)) { apagar_upload_sem_uso($pdf); $d['url'] = $existente['url'] ?? ''; }
+                    if (is_string($pdf)) { apagar_upload_sem_uso($pdf); $d['url'] = $doLink !== '' ? $urlWeb : ($existente['url'] ?? ''); }
                     if ($baixada !== '') { apagar_upload_sem_uso($baixada); $d['imagem'] = $existente['imagem'] ?? ''; }
                     flash('erro', implode(' ', $erros));
-                    $form = $d + ['id' => $id, 'imagem_url' => $imgLink, 'sugestao_maquina' => post_str('sugestao_maquina')];
+                    $form = $d + ['id' => $id, 'imagem_url' => $imgLink, 'pdf_url' => $pdfLink, 'sugestao_maquina' => post_str('sugestao_maquina')];
                 } else {
                     $ok = $dao->salvar($d, $id);
                     if ($ok && $existente && ($existente['imagem'] ?? '') !== $d['imagem']) apagar_upload_sem_uso((string)$existente['imagem']);
@@ -414,7 +458,7 @@ final class AdminController extends Controller {
                     if (!$ok && is_string($pdf)) apagar_upload_sem_uso($pdf);
                     // Aprendizado automático: o conteúdo salvo é a resposta certa para a sugestão da extração.
                     if ($ok) $this->aprenderComRevisao('curso', $d + ['categoria' => array_column($cats, 'nome', 'id')[(int)$d['categoria_id']] ?? ''], post_str('sugestao_maquina'));
-                    flash($ok ? 'ok' : 'erro', $ok ? 'Conteúdo salvo.'.($usouPadrao ? ' Entrou com a imagem padrão da plataforma: quando tiver a imagem certa, use Editar para trocar.' : '') : 'Não foi possível salvar.');
+                    flash($ok ? 'ok' : 'erro', $ok ? 'Conteúdo salvo.'.$avisoPdf.($usouPadrao ? ' Entrou com a imagem padrão da plataforma: quando tiver a imagem certa, use Editar para trocar.' : '') : 'Não foi possível salvar.');
                     redirect('admin/pages/cursos.php'.painel_qs());   // volta para a mesma aba, filtros e ordem
                 }
             }
@@ -440,10 +484,18 @@ final class AdminController extends Controller {
         [$lista, $pagina, $paginas] = paginar(ordenar_linhas($lista, $ordem, $dir), 25);
         $comFiltro = $busca !== '' || $filtroCat || $filtroSituacao !== '';
         $comImagemPadrao = count(array_filter($dao->listar(false), fn($c) => CursoDAO::ehImagemPadrao((string)$c['imagem'])));
+        // E-books que ainda abrem o PDF no site de origem: o botão "Trazer os PDFs para a biblioteca" resolve todos de uma vez.
+        $ebooksNaWeb = count(array_filter($dao->listar(false), fn($c) => $c['tipo'] === 'ebook' && url_http_valida((string)$c['url'])));
         $imagens = array_merge(imagens_da_pasta('assets/img/cursos'), imagens_da_pasta('assets/img/cursos/capas'), imagens_da_pasta('assets/img/ebooks'), imagens_da_pasta('assets/img/padrao'));
         $importacao = (array)($_SESSION['import_cursos'] ?? []);
         $title = 'Cursos e e-books';
         $abaAtiva = 'cursos';
         $this->view('admin/cursos', get_defined_vars());
+    }
+
+    /** Descrição + de onde veio o PDF guardado na biblioteca (crédito da fonte; não repete se já estiver lá). */
+    private static function comFonte(string $descricao, string $link): string {
+        if ($link === '' || !url_http_valida($link) || str_contains($descricao, $link)) return $descricao;
+        return ltrim(rtrim($descricao)."\n\nFonte original: ".$link);
     }
 }

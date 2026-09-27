@@ -17,12 +17,12 @@ try {
     $areas = ExtracaoCurso::AREAS;   // banco desligado: usa as áreas do seed
 }
 
-$modelo = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\nCarga horária:\nGratuito:\nPreço:\nÁrea:\nLink: https://...\nImagem: https://...\nDescrição:";
+$modelo = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\nCarga horária:\nGratuito:\nPreço:\nÁrea:\nLink: https://...\nPDF: https://... (e-book gratuito: link direto do arquivo)\nImagem: https://...\nDescrição:";
 $md = "# Prompt padrão — pesquisa de cursos e e-books para o cadastro\n\n";
 $md .= "Peça a uma IA de pesquisa (Perplexity, ChatGPT, Gemini, Copilot, Claude) que pesquise **cada link ou título** e devolva uma **ficha** com os mesmos campos do cadastro. Depois é só colar a resposta na caixa **Extrair** do painel (**Painel → Cursos e e-books**):\n\n";
 $md .= "- **uma ficha** → preenche o formulário: revise e clique em **Salvar conteúdo**;\n- **várias fichas** (separadas por `---`) → prévia: confira e clique em **Cadastrar marcados**;\n";
 $md .= "- **com imagem** na ficha, ela é conferida e baixada; **sem imagem**, o conteúdo entra com a **imagem padrão** da plataforma e aparece na lista como *trocar imagem* (use Editar quando tiver a imagem certa);\n";
-$md .= "- **PDF na nossa biblioteca**: no cadastro, envie o PDF do e-book e o botão vira **Baixar**; conteúdo que fica na web mostra **Acessar**.\n\n";
+$md .= "- **PDF na nossa biblioteca**: com o campo **PDF:** na ficha (ou o link do e-book apontando para o PDF), o cadastro baixa o PDF para a biblioteca da plataforma e o botão vira **Baixar**; também dá para enviar o arquivo à mão. Conteúdo que fica na web mostra **Acessar**. Os e-books antigos que ainda abrem no site de origem vêm todos de uma vez pelo botão **Trazer os PDFs para a biblioteca** (painel → Cursos e e-books).\n\n";
 $md .= "> Gerado em ".date('d/m/Y')." com as áreas cadastradas. Criou ou renomeou áreas? Rode `C:\\xampp\\php\\php.exe docs\\gerar_prompts.php`.\n\n";
 $md .= "## Modelo da ficha\n\n```text\n{$modelo}\n```\n\n";
 $md .= "## Onde colar o prompt em cada IA\n\n| IA | Como usar |\n|---|---|\n";

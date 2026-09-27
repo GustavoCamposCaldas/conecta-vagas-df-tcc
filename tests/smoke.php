@@ -248,6 +248,18 @@ confere('ExtracaoCurso: link com parênteses não é cortado (".../Cartilha%20(2
 $comImagem = ExtracaoCurso::fichas("Título: Guia X\nTipo: E-book\nLink: https://x.gov.br/guia.pdf\nImagem: https://x.gov.br/capa.jpg\n---\nTítulo: Curso Y\nLink: https://x.gov.br/y\nImagem: Não encontrada\n---");
 confere('Padrão da ficha tem Imagem: o prompt pede e a máquina lê', str_contains(ExtracaoCurso::promptPesquisa([]), 'Imagem:')
     && ($comImagem[0]['imagem_url'] ?? '') === 'https://x.gov.br/capa.jpg' && ($comImagem[1]['imagem_url'] ?? null) === '');
+// BIBLIOTECA: a ficha traz o link direto do PDF (campo "PDF:") e, na página do e-book, o PDF é achado sozinho.
+$comPdf = ExtracaoCurso::fichas("Título: Guia Z\nTipo: E-book\nLink: https://z.gov.br/guia\nPDF: https://z.gov.br/arquivos/guia-z.pdf\n---\nTítulo: Guia W\nTipo: E-book\nLink: https://w.gov.br/w.pdf\nPDF: Não encontrado\n---");
+$paginaDspace = '<html><head><meta name="citation_pdf_url" content="http://educapes.capes.gov.br/bitstream/capes/1/2/Cartilha%20A5.pdf"></head><body><a href="/termos.pdf">Termos</a></body></html>';
+$paginaLinks = '<p><a href="/docs/edital.pdf">Edital</a> <a href="arquivos/ebook-final.pdf?v=2">Baixar o e-book</a></p>';
+confere('Biblioteca: campo "PDF:" da ficha, prompt pede o PDF, PDF achado na página (metatag do repositório ou link "Baixar")',
+    ($comPdf[0]['pdf_url'] ?? '') === 'https://z.gov.br/arquivos/guia-z.pdf' && ($comPdf[1]['pdf_url'] ?? null) === '' && ($comPdf[1]['url'] ?? '') === 'https://w.gov.br/w.pdf'
+    && str_contains(ExtracaoCurso::promptPesquisa([]), 'PDF:') && str_contains(PromptsPesquisa::formatoFicha([]), 'PDF:')
+    && ImagemRemota::pdfDaPagina($paginaDspace, 'https://educapes.capes.gov.br/handle/capes/1') === 'http://educapes.capes.gov.br/bitstream/capes/1/2/Cartilha%20A5.pdf'
+    && ImagemRemota::pdfDaPagina($paginaLinks, 'https://site.org/livros/pagina') === 'https://site.org/livros/arquivos/ebook-final.pdf?v=2'
+    && ImagemRemota::pdfDaPagina('<p>sem pdf</p>', 'https://site.org/') === '' && !(new CursoDAO())->guardarNaBiblioteca(1, 'https://fora.com/x.pdf', 'x')
+    && ImagemRemota::pdfs(['http://127.0.0.1/x.pdf', 'file:///C:/Windows/win.ini']) === [],
+    json_encode([$comPdf[0]['pdf_url'] ?? null, $comPdf[1]['pdf_url'] ?? null, ImagemRemota::pdfDaPagina($paginaLinks, 'https://site.org/livros/pagina')], JSON_UNESCAPED_UNICODE));
 // Pesquisa guiada de cursos (FontesCursos): fonte pelo link, nome padronizado, lacunas e prompt direcionado.
 confere('FontesCursos: reconhece a fonte oficial pelo link (subdomínio e gov.br/caminho) e padroniza o nome',
     FontesCursos::fonteDoLink('https://www.ev.org.br/cursos/x') === 'bradesco' && FontesCursos::fonteDoLink('https://sp.senai.br/c') === 'senai'
@@ -394,6 +406,10 @@ for ($i = 0; $i < 8; $i++) {
     $pronto->aprender(Tokenizador::palavras("Atender clientes no caixa da loja $i"), 'descricao');
 }
 $anuncio = "ATENDENTE\nUniforme fornecido pela empresa\nVenha trabalhar na Padaria Pão Quente";
+// Modelo em memória → temperatura em memória também: a calibrada no banco muda com o uso de cada máquina
+// (ex.: depois de revisar anúncios ela sobe e a confiança fica mais cautelosa), e o teste é da lógica de decisão.
+MaquinaAprendizado::usarTemperatura('vaga_linha', 1.0);
+MaquinaAprendizado::usarTemperatura('vaga_categoria', 1.0);
 MaquinaAprendizado::ligar(true);
 MaquinaAprendizado::usarModelo('vaga_linha', $pronto);
 MaquinaAprendizado::usarProvas('vaga_linha', 30, 29);   // passou no período de experiência (97%)

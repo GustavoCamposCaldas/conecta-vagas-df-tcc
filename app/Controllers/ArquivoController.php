@@ -29,6 +29,8 @@ final class ArquivoController extends Controller {
         // O nome do arquivo muda a cada envio, então o navegador pode guardar a imagem em cache.
         header('Cache-Control: public, max-age=604800');
         header('Content-Length: '.filesize($path));
+        // E-book grande em internet lenta: a entrega não é cortada pelo limite de tempo do PHP (readfile não usa memória).
+        if ($pdfBiblioteca) set_time_limit(0);
         readfile($path);
     }
 

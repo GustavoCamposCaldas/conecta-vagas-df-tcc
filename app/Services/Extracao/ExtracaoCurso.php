@@ -161,6 +161,7 @@ final class ExtracaoCurso {
         'gratuito' => 'gratuito|gratis|custo',
         'preco' => 'preco|valor',
         'url' => 'link|link oficial|url|site|endereco',
+        'pdf_url' => 'pdf|link do pdf|link direto do pdf|arquivo pdf|pdf direto|download|link de download|link para download',
         'categoria' => 'area|categoria',
         'descricao' => 'descricao|resumo|sobre',
         'imagem' => 'imagem|imagem da capa|imagem de capa|capa|link da imagem|url da imagem|foto|banner',
@@ -215,6 +216,9 @@ final class ExtracaoCurso {
         if (($c['titulo'] ?? '') !== '') $r['titulo'] = mb_substr(trim($c['titulo'], ' "\''), 0, 255);
         if (($c['instituicao'] ?? '') !== '') $r['instituicao'] = mb_substr($c['instituicao'], 0, 255);
         if (($link = self::primeiroLink($c['url'] ?? '')) !== '') $r['url'] = $link;
+        // Link direto do PDF (e-book gratuito): ao cadastrar, o PDF vai para a biblioteca da plataforma.
+        $r['pdf_url'] = self::primeiroLink($c['pdf_url'] ?? '');
+        if ($r['url'] === '' && $r['pdf_url'] !== '') $r['url'] = $r['pdf_url'];
         $r['instituicao'] = FontesCursos::nomeOficial($r['instituicao'], $r['url']);   // nome padronizado pela fonte oficial do link
         if ($n('tipo') !== '') $r['tipo'] = preg_match('/e ?book|livro|apostila|guia|pdf/', $n('tipo')) ? 'ebook' : (preg_match('/video|webinar|aula gravada/', $n('tipo')) ? 'video' : 'curso');
         if ($n('modalidade') !== '') $r['modalidade'] = preg_match('/hibrid|semipresencial/', $n('modalidade')) ? 'hibrido' : (preg_match('/^presencial/', $n('modalidade')) ? 'presencial' : 'ead');

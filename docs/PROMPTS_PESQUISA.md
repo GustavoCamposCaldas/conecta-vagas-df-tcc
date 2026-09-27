@@ -5,9 +5,9 @@ Peça a uma IA de pesquisa (Perplexity, ChatGPT, Gemini, Copilot, Claude) que pe
 - **uma ficha** → preenche o formulário: revise e clique em **Salvar conteúdo**;
 - **várias fichas** (separadas por `---`) → prévia: confira e clique em **Cadastrar marcados**;
 - **com imagem** na ficha, ela é conferida e baixada; **sem imagem**, o conteúdo entra com a **imagem padrão** da plataforma e aparece na lista como *trocar imagem* (use Editar quando tiver a imagem certa);
-- **PDF na nossa biblioteca**: no cadastro, envie o PDF do e-book e o botão vira **Baixar**; conteúdo que fica na web mostra **Acessar**.
+- **PDF na nossa biblioteca**: com o campo **PDF:** na ficha (ou o link do e-book apontando para o PDF), o cadastro baixa o PDF para a biblioteca da plataforma e o botão vira **Baixar**; também dá para enviar o arquivo à mão. Conteúdo que fica na web mostra **Acessar**. Os e-books antigos que ainda abrem no site de origem vêm todos de uma vez pelo botão **Trazer os PDFs para a biblioteca** (painel → Cursos e e-books).
 
-> Gerado em 26/09/2026 com as áreas cadastradas. Criou ou renomeou áreas? Rode `C:\xampp\php\php.exe docs\gerar_prompts.php`.
+> Gerado em 27/09/2026 com as áreas cadastradas. Criou ou renomeou áreas? Rode `C:\xampp\php\php.exe docs\gerar_prompts.php`.
 
 ## Modelo da ficha
 
@@ -23,6 +23,7 @@ Gratuito:
 Preço:
 Área:
 Link: https://...
+PDF: https://... (e-book gratuito: link direto do arquivo)
 Imagem: https://...
 Descrição:
 ```
@@ -52,6 +53,7 @@ Mantenha a mesma ordem da minha lista. Use SEMPRE a pesquisa na web para abrir a
 REGRAS DE PESQUISA:
 1. Abra a página OFICIAL de cada item (site da instituição) antes de responder. Nunca invente link, carga horária, preço ou imagem: o que não achar, escreva Não informado (na imagem: Não encontrada).
 2. Link: o endereço oficial da página do próprio curso/e-book (para e-book, pode ser o PDF oficial). Nada de página inicial, resultado de busca ou site que copia conteúdo.
+   PDF (e-book gratuito): o link DIRETO do arquivo no site oficial (o que baixa o PDF, terminando em .pdf) — a plataforma guarda esse PDF na biblioteca dela. Nunca de site que copia conteúdo; livro pago não tem PDF.
 3. Imagem: endereço DIRETO de uma imagem oficial do item, terminando em .jpg, .jpeg, .png ou .webp — no e-book, a CAPA; no curso, a imagem de divulgação da página. Nunca logotipo genérico, ícone ou imagem de outro site. Não achou? Escreva Não encontrada (o cadastro entra com a imagem padrão da plataforma).
 4. Fontes oficiais preferidas: Fundação Bradesco – Escola Virtual (ev.org.br), Escola Virtual.Gov (Enap) (escolavirtual.gov.br), SEBRAE (sebrae.com.br), Google Grow (grow.google), Microsoft Learn (learn.microsoft.com), FGV Online (educacao-executiva.fgv.br), IFB – Instituto Federal de Brasília (ifb.edu.br), SENAI (senai.br), SENAC (senac.br), Banco Central do Brasil (bcb.gov.br), CERT.br / NIC.br (cartilha.cert.br), Febraban – Meu Bolso em Dia (meubolsoemdia.com.br), Ministério do Trabalho e Emprego (gov.br/trabalho-e-emprego), eduCAPES (educapes.capes.gov.br), CVM – Portal do Investidor (gov.br/investidor), Cisco Networking Academy (netacad.com), Fundação Estudar (estudar.org.br). Outras instituições públicas ou reconhecidas valem se o link for do site oficial delas.
 5. Tudo em português. Descrição curta e objetiva, sem propaganda. Diga se tem certificado. Área: escolha a mais próxima da lista (nunca invente uma área nova).
@@ -70,6 +72,7 @@ Gratuito: Sim | Não
 Preço: ex.: R$ 49,90 (só se não for gratuito)
 Área: uma destas: Administração e Atendimento | Carreira e Empregabilidade | Empreendedorismo e Gestão | Informática e Excel | Marketing, Dados e UX | Negócios, Finanças e ESG | Tecnologia e Inteligência Artificial
 Link: endereço oficial completo, começando com https://
+PDF: (só e-book gratuito) endereço DIRETO do arquivo PDF oficial, terminando em .pdf (ou Não encontrado)
 Imagem: endereço direto da imagem da capa (e-book) ou da imagem do curso, começando com https://
 Descrição: 1 ou 2 frases dizendo o que a pessoa aprende e se tem certificado
 ---
@@ -93,6 +96,7 @@ ITENS:
 REGRAS DE PESQUISA:
 1. Abra a página OFICIAL de cada item (site da instituição) antes de responder. Nunca invente link, carga horária, preço ou imagem: o que não achar, escreva Não informado (na imagem: Não encontrada).
 2. Link: o endereço oficial da página do próprio curso/e-book (para e-book, pode ser o PDF oficial). Nada de página inicial, resultado de busca ou site que copia conteúdo.
+   PDF (e-book gratuito): o link DIRETO do arquivo no site oficial (o que baixa o PDF, terminando em .pdf) — a plataforma guarda esse PDF na biblioteca dela. Nunca de site que copia conteúdo; livro pago não tem PDF.
 3. Imagem: endereço DIRETO de uma imagem oficial do item, terminando em .jpg, .jpeg, .png ou .webp — no e-book, a CAPA; no curso, a imagem de divulgação da página. Nunca logotipo genérico, ícone ou imagem de outro site. Não achou? Escreva Não encontrada (o cadastro entra com a imagem padrão da plataforma).
 4. Fontes oficiais preferidas: Fundação Bradesco – Escola Virtual (ev.org.br), Escola Virtual.Gov (Enap) (escolavirtual.gov.br), SEBRAE (sebrae.com.br), Google Grow (grow.google), Microsoft Learn (learn.microsoft.com), FGV Online (educacao-executiva.fgv.br), IFB – Instituto Federal de Brasília (ifb.edu.br), SENAI (senai.br), SENAC (senac.br), Banco Central do Brasil (bcb.gov.br), CERT.br / NIC.br (cartilha.cert.br), Febraban – Meu Bolso em Dia (meubolsoemdia.com.br), Ministério do Trabalho e Emprego (gov.br/trabalho-e-emprego), eduCAPES (educapes.capes.gov.br), CVM – Portal do Investidor (gov.br/investidor), Cisco Networking Academy (netacad.com), Fundação Estudar (estudar.org.br). Outras instituições públicas ou reconhecidas valem se o link for do site oficial delas.
 5. Tudo em português. Descrição curta e objetiva, sem propaganda. Diga se tem certificado. Área: escolha a mais próxima da lista (nunca invente uma área nova).
@@ -111,6 +115,7 @@ Gratuito: Sim | Não
 Preço: ex.: R$ 49,90 (só se não for gratuito)
 Área: uma destas: Administração e Atendimento | Carreira e Empregabilidade | Empreendedorismo e Gestão | Informática e Excel | Marketing, Dados e UX | Negócios, Finanças e ESG | Tecnologia e Inteligência Artificial
 Link: endereço oficial completo, começando com https://
+PDF: (só e-book gratuito) endereço DIRETO do arquivo PDF oficial, terminando em .pdf (ou Não encontrado)
 Imagem: endereço direto da imagem da capa (e-book) ou da imagem do curso, começando com https://
 Descrição: 1 ou 2 frases dizendo o que a pessoa aprende e se tem certificado
 ---

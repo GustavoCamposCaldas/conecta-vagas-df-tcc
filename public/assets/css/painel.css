@@ -379,3 +379,7 @@ body.cv .ml-memorias h3{margin:0 0 8px;font-size:14px;color:var(--gf-tinta)}
 .pn-miniatura.cartaz,.pn-miniatura.ebook{width:40px;height:54px}
 .pn-miniatura-vazia{display:grid;place-items:center;color:#8f9aab}
 .pn .table td.pn-td-img{width:1%;padding-right:4px}
+.pn-biblioteca{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 14px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff}
+.pn-biblioteca p{margin:0;flex:1 1 320px}
+.pn-biblioteca .form-actions{margin:0}
+.pn-biblioteca .carregador{flex-basis:100%;margin:0}

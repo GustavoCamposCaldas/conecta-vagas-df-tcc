@@ -45,6 +45,8 @@ function salvar_imagem_enviada(string $campo, string $prefixo, int $maxBytes = 3
 
 /** Tamanho máximo de um PDF da biblioteca (e-book guardado na plataforma). */
 const MAX_PDF_BIBLIOTECA = 25 * 1024 * 1024;
+/** Tamanho máximo de um PDF baixado da web para a biblioteca (cartilhas ilustradas chegam a 100 MB — o eduCAPES tem uma de 108 MB). */
+const MAX_PDF_REMOTO = 150 * 1024 * 1024;
 
 /** O link é um PDF da nossa biblioteca ("assets/uploads/biblioteca_....pdf")? */
 function eh_pdf_biblioteca(string $url): bool {

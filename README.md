@@ -33,6 +33,13 @@ Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premiu
 5. Acesse `http://localhost/<pasta do projeto>/` — nesta máquina: **`http://localhost/conecta%20vagas%20df%20tcc/`**
    (espaços no nome da pasta viram `%20`).
 6. Confira se está tudo certo: `C:\xampp\php\php.exe tests\smoke.php`
+7. **Biblioteca de e-books** (precisa de internet, uma vez só): entre como administrador → **Cursos e e-books** →
+   **Trazer os PDFs para a biblioteca**. Os PDFs dos e-books são baixados para `storage/uploads/` (arquivos
+   enviados não vão para o Git) e o botão deles passa de "Acessar" para **"Baixar"**. Sem esse passo, tudo
+   funciona igual, só que os e-books abrem no site de origem.
+
+**Nada mais para instalar.** O leitor de cartaz das vagas (OCR) vem com o site e roda no navegador; os PDFs e
+os currículos são lidos em PHP puro. Tesseract e Poppler no servidor são opcionais (só reserva).
 
 ### Contas de teste
 

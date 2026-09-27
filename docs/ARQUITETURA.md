@@ -271,6 +271,16 @@ fica fora do painel, em [PROMPTS_PESQUISA.md](PROMPTS_PESQUISA.md) (gerado por `
   até 25 MB) e é entregue ao público por `ArquivoController::imagem` — só PDFs com esse prefixo, então currículo
   nunca sai por ali. O botão é decidido pelo endereço (`pt_acesso_conteudo`): biblioteca → **Baixar** (download);
   web → **Acessar** (nova aba).
+- **Da pesquisa direto para a biblioteca**: a ficha tem o campo **PDF:** (link direto do arquivo do e-book gratuito,
+  pedido no prompt). Ao salvar um e-book com "Guardar o PDF na nossa biblioteca" marcado (padrão para e-book), ou
+  ao cadastrar um lote com a opção da prévia, `ImagemRemota::pdfs` baixa o PDF — do campo PDF, do link oficial ou
+  achado na página (`pdfDaPagina`: metatag `citation_pdf_url` dos repositórios como o eduCAPES, ou o link
+  "baixar/e-book" da página). Download direto para o disco (sem ocupar memória), 6 por vez, até 150 MB e 180 s cada,
+  só de servidor público (inclusive depois de redirecionamentos) e só PDF inteiro (tipo conferido e fim `%%EOF`).
+  A descrição ganha "Fonte original: <link>" (crédito). Sem PDF público no link, o conteúdo fica com "Acessar".
+- Botão **Trazer os PDFs para a biblioteca** (aparece enquanto houver e-book com link da web): faz o mesmo com todos
+  de uma vez — é o passo que os colegas rodam depois de importar o `seed.sql`, já que `storage/uploads` não vai
+  para o Git. A entrega de PDF grande não é cortada pelo limite de tempo do PHP (`set_time_limit(0)` + `readfile`).
 - A instituição é padronizada pelo link oficial ao salvar e ao importar (`FontesCursos::nomeOficial`).
 
 **Manutenção automática** (`manutencao_diaria()` em `app/Core/Upload.php`, disparada pela visão geral do
