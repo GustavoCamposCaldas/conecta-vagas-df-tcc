@@ -80,6 +80,16 @@ function paginar(array $linhas, int $porPagina = 25): array {
 }
 
 /**
+ * Carregador das máquinas de extração: AMARELO enquanto carrega/lê, AZUL quando está pronto.
+ * Sem $texto sai escondido (o JavaScript mostra e atualiza); com $pronto sai azul e cheio (resultado já na tela).
+ */
+function carregador_html(string $texto = '', bool $pronto = false): string {
+    return '<div class="carregador'.($pronto ? ' pronto' : '').'" data-carregador role="status" aria-live="polite"'.($texto === '' ? ' hidden' : '').'>'
+        .'<div class="carregador-trilho"><span class="carregador-barra"'.($pronto ? ' style="width:100%"' : '').'></span></div>'
+        .'<span class="carregador-texto">'.e($texto).'</span></div>';
+}
+
+/**
  * Endereço da própria lista com os filtros atuais trocando só o que vier em $troca
  * (ordem, dir, pagina, tipo...). Não leva edit/ver: abrir um formulário não muda a lista.
  */

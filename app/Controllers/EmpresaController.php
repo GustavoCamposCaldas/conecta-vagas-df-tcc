@@ -97,11 +97,16 @@ final class EmpresaController extends Controller {
                     }
                     $this->descartarCartazesLidos();
                     $_SESSION['cartazes_lidos'] = [$cartaz];
-                    $extraido = ExtracaoVaga::doImagem((string)caminho_upload($cartaz));
+                    // Leituras feitas no navegador pelo leitor da plataforma; sem elas, o Tesseract do servidor (se houver).
+                    $extraido = ExtracaoVaga::doImagem((string)caminho_upload($cartaz), OcrImagem::leiturasDoNavegador($_POST['ocr_tsv'] ?? null));
                     $imagemForm = $cartaz;
                 } else {
+                    // Caixa vazia (ex.: clicou em "Extrair" enquanto o cartaz ainda era lido): volta sem relatório em branco.
+                    if (post_str('texto_anuncio') === '') {
+                        flash('erro', 'Cole o texto do anúncio (ou envie o cartaz) antes de extrair.');
+                        redirect('admin/pages/vagas.php'.painel_qs($id ? ['edit' => $id] : []));
+                    }
                     $extraido = ExtracaoVaga::doTexto(post_str('texto_anuncio'));
-                    if (post_str('texto_anuncio') === '') $extraido['avisos'][] = 'Cole o texto do anúncio antes de extrair.';
                 }
                 $cat = $extraido['categoria'] ? $catDao->buscarPorNome($extraido['categoria'], 'vaga') : null;
                 if ($cat && !(int)$cat['ativo']) $cat = null; // categoria desativada não é aplicada

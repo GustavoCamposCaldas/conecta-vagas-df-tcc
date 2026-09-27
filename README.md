@@ -11,7 +11,7 @@ Trabalho de Conclusão de Curso (TCC).
 |---|---|
 | Visitante | Vagas e cursos/e-books com busca e filtros; página de cada vaga e curso; planos. |
 | Candidato | Envia o currículo (PDF/DOCX/DOC) e a **máquina de extração** preenche o perfil; com o cadastro completo, ganha um **portfólio** automático e a **máquina de match** (nota de 0 a 100, explicada, com cada vaga); candidata-se e acompanha o retorno das empresas. |
-| Empresa | Publica vagas (cola o anúncio e a **extração de vagas** preenche o formulário), recebe candidaturas ordenadas pelo match e consulta o banco de talentos. |
+| Empresa | Publica vagas (envia o **cartaz** ou cola o anúncio e a **extração de vagas** preenche o formulário — o leitor de cartaz roda no navegador, sem instalar nada), recebe candidaturas ordenadas pelo match e consulta o banco de talentos. |
 | Administrador | Gerencia usuários, categorias, cursos/e-books (com **extração de cursos**), vagas e candidaturas, e acompanha a **máquina de aprendizado**. |
 
 Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premium**.
@@ -94,6 +94,7 @@ TCC_GUSTAVO/
 ├── public/                ÚNICA pasta servida pelo Apache
 │   ├── index.php          front controller: porta de entrada de todas as páginas + tabela de rotas
 │   └── assets/            CSS, JavaScript e imagens (carrossel, cartazes das vagas, capas dos cursos)
+│       └── js/vendor/tesseract/  leitor de cartaz da plataforma (Tesseract.js + português), servido pelo próprio site
 ├── storage/               arquivos gerados pelo sistema (inacessível pelo navegador)
 │   ├── uploads/           currículos, fotos, logos e cartazes enviados
 │   ├── logs/              registros internos (ex.: links de redefinição de senha)

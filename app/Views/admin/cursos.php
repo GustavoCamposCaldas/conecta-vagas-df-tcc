@@ -17,17 +17,17 @@ $modeloFicha = "Título:\nTipo:\nInstituição:\nModalidade:\nCidade:\nNível:\n
 <div class="form" style="max-width:none">
     <section class="cx-extrair" id="extrair" aria-labelledby="cx-extrair-tit">
         <h2 class="pn-form-titulo" id="cx-extrair-tit">Extrair</h2>
-        <form method="post">
+        <form method="post" data-carregando="Extraindo a ficha e conferindo o link e a imagem…">
             <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="extrair"><input type="hidden" name="id" value="<?=(int)($form['id'] ?? 0)?>">
             <label for="c-texto" class="sr-only">Ficha da pesquisa ou texto de divulgação</label>
-            <textarea id="c-texto" name="texto_anuncio" rows="6" placeholder="<?=e("Cole aqui a ficha (uma ou várias, separadas por ---) ou o texto de divulgação:\n\n".$modeloFicha)?>"><?=e(post_str('texto_anuncio'))?></textarea>
+            <textarea id="c-texto" name="texto_anuncio" required rows="6" placeholder="<?=e("Cole aqui a ficha (uma ou várias, separadas por ---) ou o texto de divulgação:\n\n".$modeloFicha)?>"><?=e(post_str('texto_anuncio'))?></textarea>
             <div class="form-actions"><button class="btn">Extrair</button><span class="meta">1 ficha ou texto → preenche o formulário abaixo · várias fichas → prévia para cadastrar de uma vez</span></div>
         </form>
         <?php if ($extraido): ?>
-            <div class="alert info" style="margin:10px 0 0">Dados extraídos — revise abaixo e clique em <b>Salvar conteúdo</b>.<?=($form['imagem_url'] ?? '') === '' && ($form['imagem'] ?? '') === '' ? ' Sem imagem na ficha: vai entrar com a imagem padrão (troque depois).' : ''?></div>
+            <?=carregador_html('Pronto: dados extraídos — revise abaixo e clique em "Salvar conteúdo".'.(($form['imagem_url'] ?? '') === '' && ($form['imagem'] ?? '') === '' ? ' Sem imagem na ficha: vai entrar com a imagem padrão (troque depois).' : ''), true)?>
         <?php endif; ?>
         <?php if ($importacao): ?>
-        <form method="post" class="imp-previa" style="margin-top:12px">
+        <form method="post" class="imp-previa" style="margin-top:12px" data-carregando="Cadastrando os conteúdos e baixando as imagens…">
             <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="importar_salvar">
             <div class="table-wrap"><table class="table">
                 <tr><th><span class="sr-only">Importar</span></th><th>Imagem</th><th>Título</th><th>Tipo</th><th>Instituição</th><th>Modalidade</th><th>Área</th><th>Link</th><th>Situação</th></tr>

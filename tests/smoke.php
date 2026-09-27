@@ -203,6 +203,22 @@ $re9 = ExtracaoVaga::doTexto($ocrRe9["texto"], $ocrRe9);
 confere("cartaz com cargo em várias linhas, slogan e logotipo ilegível (calibrado)", $re9["titulo"] === "Operador de Máquina Costal (Roçadeira)" && $re9["anunciante"] === ""
     && $re9["categoria"] === "Serviços Gerais e Limpeza" && str_contains($re9["beneficios"], "Vale Refeição: R$ 48,00 por dia") && !preg_match("/solu|diferen|lugar|req\(/iu", $re9["beneficios"].$re9["descricao"])
     && $re9["contato"] === "WhatsApp (61) 97402-3121" && $re9["cidade"] === "Brasília", json_encode([$re9["titulo"], $re9["anunciante"], $re9["categoria"], $re9["beneficios"]], JSON_UNESCAPED_UNICODE));
+// Leitor de cartaz DA PLATAFORMA (Tesseract.js no navegador): leituras reais de dois cartazes, salvas em tests/amostras.
+$amostra = fn(string $n) => OcrImagem::leiturasDoNavegador(json_decode((string)file_get_contents(__DIR__.'/amostras/'.$n.'.json'), true));
+confere('OcrImagem::leiturasDoNavegador aceita só leituras no formato do Tesseract (tamanho e quantidade limitados)', $amostra('ocr_navegador_smile') !== null
+    && OcrImagem::leiturasDoNavegador('texto') === null && OcrImagem::leiturasDoNavegador(['a', 'b', 'c', 'd', 'e']) === null && OcrImagem::leiturasDoNavegador([['x']]) === null
+    && OcrImagem::leiturasDoNavegador([str_repeat('x', 1_600_000)]) === null && OcrImagem::leiturasDoNavegador(["Vaga: Vendedor\nSalário: R$ 2.000"]) === null);
+$smile = ExtracaoVaga::doImagem('', $amostra('ocr_navegador_smile'));
+confere('cartaz lido no navegador (Smile & Face): título em 2 linhas, marca pelo e-mail, shopping não é empresa, "R$ 700 VT/VR" não é salário',
+    $smile['motor'] === 'navegador' && $smile['titulo'] === 'Estágio Social Media' && $smile['anunciante'] === 'Smile & Face' && $smile['cidade'] === 'Asa Norte'
+    && $smile['salario_minimo'] === 1000.0 && $smile['salario_maximo'] === 2200.0 && str_contains($smile['contato'], 'admsmileface@gmail.com')
+    && $smile['tipo_vaga'] === 'estagio' && !str_contains($smile['requisitos'], 'CASE DE SUCESSO') && !str_contains($smile['descricao'], 'Conjunto Nacional contrata'),
+    json_encode([$smile['titulo'], $smile['anunciante'], $smile['salario_minimo'], $smile['salario_maximo'], $smile['contato']], JSON_UNESCAPED_UNICODE));
+$mim = ExtracaoVaga::doImagem('', $amostra('ocr_navegador_mimoria'));
+confere('cartaz lido no navegador (Mimória): "CONSULTORDE" grudado pelo OCR, marca em 2 linhas confirmada pelo e-mail',
+    $mim['titulo'] === 'Consultor de Vendas' && $mim['anunciante'] === 'Mimória Business' && str_contains($mim['contato'], 'mimoriabusiness@gmail.com')
+    && $mim['cidade'] === 'Asa Sul' && $mim['salario_minimo'] === 2000.0 && $mim['tipo_vaga'] === 'pj',
+    json_encode([$mim['titulo'], $mim['anunciante'], $mim['contato'], $mim['cidade'], $mim['salario_minimo']], JSON_UNESCAPED_UNICODE));
 $rel = ExtracaoVaga::relatorio($vaga, 'Vendas');
 confere('ExtracaoVaga::relatorio conta lidos, padrão e faltando', $rel['lidos'] + $rel['padrao'] + $rel['faltando'] === count($rel['itens']) && $rel['lidos'] >= 5
     && in_array('nivel_experiencia', array_column(array_filter($rel['itens'], fn($i) => $i['status'] === 'padrao'), 'campo'), true), json_encode([$rel['lidos'], $rel['padrao'], $rel['faltando']]));
@@ -491,6 +507,9 @@ if ($status('') === 0) {
               'cursos.php?pagina=99' => 200, 'cursos.php?tipo=xyz' => 200,
               'planos.php' => 200, 'login.php' => 200, 'cadastro.php' => 200, 'esqueci_senha.php' => 200, 'contrato.php' => 200,
               'assets/css/app.css' => 200, 'vaga.php?id=999999' => 404, 'nao-existe.php' => 404,
+              // Leitor de cartaz da plataforma: tudo servido pelo próprio site (nada instalado no servidor).
+              'assets/js/leitor-cartaz.js' => 200, 'assets/js/vendor/tesseract/tesseract.min.js' => 200, 'assets/js/vendor/tesseract/worker.min.js' => 200,
+              'assets/js/vendor/tesseract/core/tesseract-core-simd-lstm.wasm.js' => 200, 'assets/js/vendor/tesseract/lang/por.traineddata.gz' => 200,
               'view/perfil/index.php' => 302, 'admin/index.php' => 302, 'admin/pages/aprendizado.php' => 302,
               'admin/pages/assinaturas.php' => 302, 'download.php?id=1' => 302] as $caminho => $esperado) {
         $s = $status($caminho);

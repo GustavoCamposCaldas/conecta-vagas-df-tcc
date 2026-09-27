@@ -84,7 +84,7 @@ final class ExtracaoVaga {
     /** Frases de efeito do cartaz (slogan da empresa, chamadas): não são descrição, requisito nem benefício. */
     private const SLOGANS = '/\b(faz(?:em)? a diferenca|gera(?:m)? valor|solucoes e servicos|oportunidade para quem|quem faz a diferenca|seguranca em primeiro lugar|'
         .'em primeiro lugar|equipe comprometida|foco em resultados|respeito e valorizacao|valorizacao das pessoas|sua carreira comeca aqui|venha crescer com a gente|'
-        .'o seu futuro comeca|juntos somos mais|aqui voce cresce)\b|^(oportunidade para|temos vaga|temos vagas)$/';
+        .'o seu futuro comeca|juntos somos mais|aqui voce cresce|construa seu portfolio|case de sucesso)\b|^(oportunidade para|temos vaga|temos vagas)$/';
 
     /** Marcas e redes comuns nos anúncios do DF (reconhecidas pelo nome no texto). */
     private const MARCAS = ["McDonald's", 'Subway', 'Giraffas', 'Burger King', "Bob's", 'KFC', "Habib's", 'Outback', 'Coco Bambu', 'Madero', 'Mandaka',
@@ -95,6 +95,9 @@ final class ExtracaoVaga {
 
     /** Tipos de negócio que costumam vir antes/depois do nome da empresa ("Restaurante Prosa di Minas"). */
     private const NEGOCIOS = 'restaurante|panificadora|papelaria|farmacia|drogaria|hotel|grupo|casa de paes|churrascaria|pizzaria|cantina|supermercado|posto|padaria|lanchonete|corretora|agencia|confeitaria|hamburgueria';
+    /** Ramo da empresa escrito sozinho abaixo do cargo ("SOCIAL MEDIA" / "ODONTOLOGIA"): fala do empregador, não do cargo. */
+    private const RAMOS = 'odontologia|odontologica|odonto|clinica|consultorio|advocacia|advogados|contabilidade|imobiliaria|estetica|academia|colegio|faculdade|'
+        .'hospital|laboratorio|otica|veterinaria|pet shop|petshop|construtora|seguradora|transportadora|escritorio';
 
     /** Pontos conhecidos → região administrativa (quando o cartaz cita só o shopping ou setor). */
     private const PONTOS = ['conjunto nacional' => ['Asa Norte', 'DF'], 'patio brasil' => ['Asa Sul', 'DF'], 'park shopping' => ['Guará', 'DF'],
@@ -104,15 +107,18 @@ final class ExtracaoVaga {
 
     /**
      * Lê um cartaz (imagem) e extrai a vaga.
-     * @return array<string,mixed> campos de doTexto() + texto_ocr, confianca e ocr (false = OCR indisponível)
+     * @param array{0:string,1:string,2:string,3:string}|null $leituras leituras feitas no navegador pelo leitor da
+     *        plataforma (OcrImagem::leiturasDoNavegador); sem elas, lê com o Tesseract do servidor, se houver
+     * @return array<string,mixed> campos de doTexto() + texto_ocr, confianca, ocr (false = sem leitor) e motor
      */
-    public static function doImagem(string $path): array {
-        if (!OcrImagem::disponivel()) return self::doTexto('') + ['texto_ocr' => '', 'confianca' => 0, 'ocr' => false];
-        $ocr = OcrImagem::ler($path);
+    public static function doImagem(string $path, ?array $leituras = null): array {
+        if ($leituras !== null) { $ocr = OcrImagem::montar(...$leituras); $motor = 'navegador'; }
+        elseif (OcrImagem::disponivel()) { $ocr = OcrImagem::ler($path); $motor = 'servidor'; }
+        else return self::doTexto('') + ['texto_ocr' => '', 'confianca' => 0, 'ocr' => false, 'motor' => ''];
         $r = self::doTexto($ocr['texto'], $ocr);
         if ($ocr['texto'] === '') $r['avisos'][] = 'Não foi possível ler texto nesta imagem. Preencha o formulário manualmente.';
         elseif ($ocr['confianca'] < 75) $r['avisos'][] = 'A leitura da imagem teve pouca nitidez ('.$ocr['confianca'].'% de confiança): confira cada campo.';
-        return $r + ['texto_ocr' => trim($ocr['texto']."\n".implode("\n", $ocr['complemento'])), 'confianca' => $ocr['confianca'], 'ocr' => true];
+        return $r + ['texto_ocr' => trim($ocr['texto']."\n".implode("\n", $ocr['complemento'])), 'confianca' => $ocr['confianca'], 'ocr' => true, 'motor' => $motor];
     }
 
     /**
@@ -157,7 +163,8 @@ final class ExtracaoVaga {
         [$soltas, $secoes] = self::separar($linhas);
 
         // Cargo(s) e título.
-        $r['anunciante'] = self::anunciante($tudo, $linhas, $destaques, $ocr['todas'] ?? []);
+        $emSecao = array_fill_keys(array_map([Competencias::class, 'normalizar'], [...($secoes['requisitos'] ?? []), ...($secoes['beneficios'] ?? [])]), true);
+        $r['anunciante'] = self::anunciante($tudo, $linhas, $destaques, $ocr['todas'] ?? [], $emSecao, $texto."\n".implode("\n", $ocr['complemento'] ?? []));
         if ($r['anunciante'] === '') {
             // Nenhuma regra achou a empresa: talvez seja uma que alguém já confirmou num anúncio anterior.
             $r['anunciante'] = MaquinaAprendizado::nomeConhecido('vaga_empresa', $tudo);
@@ -351,8 +358,15 @@ final class ExtracaoVaga {
     /** Linha feita só de rótulos do cartaz (sem informação própria) ou do aviso "temos outras vagas também". */
     private static function soRotulos(string $ln): bool {
         if (preg_match('/\b(temos|outras|oulras|outra)\b.{0,12}\bvagas\b|\bvagas tambem\b/', $ln)) return true;
-        $resto = preg_replace('/\b(escala|locais|local|de|do|da|trabalho|formato|horario|beneficios|comuns|salario|contratacao|modelo|requisitos|cargo|vaga|vagas)\b/', '', $ln) ?? $ln;
+        $resto = preg_replace('/\b(escala|locais|local|de|do|da|trabalho|formato|horario|beneficios|comuns|salario|contratacao|modelo|requisitos|cargo|vaga|vagas|'
+            .'modalidade|remuneracao|atividades|atribuicoes|responsabilidades|funcoes|candidatura|inscricao|inscricoes)\b/', '', $ln) ?? $ln;
         return trim($resto) === '';
+    }
+
+    /** Ponto conhecido do DF escrito sozinho ("CONJUNTO NACIONAL", "Park Shopping"): é onde fica a vaga, não a empresa. */
+    private static function ehPonto(string $ln): bool {
+        $ln = trim(preg_replace('/^shopping\s+|\s+shopping$/', '', $ln) ?? $ln);
+        return isset(self::PONTOS[$ln]) || isset(self::PONTOS[$ln.' shopping']);
     }
 
     private static function temPalavras(string $l): bool {
@@ -426,13 +440,27 @@ final class ExtracaoVaga {
     /** Palavras (normalizadas, 4+ letras) que aparecem inteiras em alguma das leituras do OCR. */
     private static function vocabularioOcr(array $textos): array {
         $v = [];
-        foreach ($textos as $t) foreach (preg_split('/\s+/u', Competencias::normalizar((string)$t)) ?: [] as $w) if (strlen($w) >= 4) $v[$w] = true;
+        foreach ($textos as $t) {
+            $ws = preg_split('/\s+/u', Competencias::normalizar((string)$t)) ?: [];
+            foreach ($ws as $i => $w) {
+                if (strlen($w) >= 4) $v[$w] = true;
+                // Par "palavra + de/da/do/em" lido separado em alguma leitura: "+consultorde" → corta depois de 9 letras.
+                if (strlen($w) >= 4 && in_array($ws[$i + 1] ?? '', ['de', 'da', 'do', 'das', 'dos', 'em'], true)) $v['+'.$w.$ws[$i + 1]] = strlen($w);
+            }
+        }
         return $v;
     }
 
     /** "MÁQUI NA" → "MÁQUINA" quando "maquina" aparece inteira em outra leitura (pedaço com até 2 letras). */
     private static function juntarPartidas(string $l, array $vocabulario): string {
         $p = preg_split('/\s+/u', $l) ?: [];
+        // O contrário também acontece: "CONSULTORDE" numa leitura e "CONSULTOR DE" em outra → separa.
+        foreach ($p as $i => $w) {
+            $n = Competencias::normalizar($w);
+            $k = $vocabulario['+'.$n] ?? null;
+            if (is_int($k) && preg_match('/^\p{L}+$/u', $w) && mb_strlen($w) === strlen($n)) $p[$i] = mb_substr($w, 0, $k).' '.mb_substr($w, $k);
+        }
+        $p = preg_split('/\s+/u', implode(' ', $p)) ?: [];
         for ($i = 0; $i + 1 < count($p); $i++) {
             if (mb_strlen($p[$i]) > 2 && mb_strlen($p[$i + 1]) > 2) continue;
             $junto = Competencias::normalizar($p[$i].$p[$i + 1]);
@@ -451,7 +479,7 @@ final class ExtracaoVaga {
 
     /** Resto de logotipo lido como texto: palavra curta com símbolo entre letras ("REQ(.ÓOM", "RE9(COM"). */
     private static function ehLixoOcr(string $l): bool {
-        return str_word_count(Competencias::normalizar($l)) <= 2 && (bool)preg_match('/\p{L}[().,;:\[\]{}]+\p{L}/u', $l) && !preg_match('/\p{L}\.\p{L}\.|https?:|www\./iu', $l);
+        return str_word_count(Competencias::normalizar($l)) <= 2 && (bool)preg_match('/\p{L}[().,;:\[\]{}]+\p{L}/u', $l) && !preg_match('/\p{L}\.\p{L}\.|https?:|www\.|[\w@]\.(?:com|net|org|br)\b/iu', $l);
     }
 
     /**
@@ -468,8 +496,10 @@ final class ExtracaoVaga {
                 $prox = $linhas[$j];
                 $pn = Competencias::normalizar($prox);
                 if ($prox !== mb_strtoupper($prox) || str_contains($prox, ':') || preg_match('/\d/', $prox) || str_word_count($pn) > 3 || !preg_match('/\p{L}{3,}/u', $prox)
-                    || preg_match(self::GENERICOS, $pn) || self::ehLocalSolto($pn) || self::soRotulos($pn) || self::ehSlogan($prox) || self::ehCargo(self::limparTitulo($prox))
+                    || preg_match(self::GENERICOS, $pn) || self::ehLocalSolto($pn) || self::ehPonto($pn) || self::soRotulos($pn) || self::ehSlogan($prox) || self::ehCargo(self::limparTitulo($prox))
                     || preg_match(self::PALAVRAS_BENEFICIO, $pn) || preg_match(self::PALAVRAS_REQUISITO, $pn) || preg_match(self::PALAVRAS_HORARIO, $pn)) break;
+                // Ramo da empresa sozinho na linha ("ODONTOLOGIA") não continua o cargo — a não ser depois de "de/em" ("AUXILIAR DE" / "CLÍNICA").
+                if (preg_match('/^(?:'.self::NEGOCIOS.'|'.self::RAMOS.')$/', $pn) && !preg_match('/\b(de|da|do|das|dos|em|e)$/', Competencias::normalizar(end($partes)))) break;
                 $partes[] = $prox;
             }
             if (count($partes) < 2) continue;
@@ -563,7 +593,8 @@ final class ExtracaoVaga {
         // 2) Vários cargos no cartaz: os escritos com as MAIORES letras são os da vaga ("GERENTE e VENDEDORA");
         //    os pequenos costumam ser "temos outras vagas também". Até 3 no título.
         if (count($cargos) >= 2 && $destaques) {
-            $grandes = array_map(fn($d) => Competencias::normalizar(self::limparTitulo($d)), array_slice($destaques, 0, 4));
+            // As leituras repetem o mesmo cargo com restos de ícone na frente ("as GERENTE", "Aa GERENTE"): limpa e olha os 8 maiores.
+            $grandes = array_map(fn($d) => Competencias::normalizar(self::limparTitulo(preg_replace('/^(?:\S{1,2}\s+)+(?=\p{Lu}{3})/u', '', $d) ?? $d)), array_slice($destaques, 0, 8));
             $principais = array_values(array_filter($cargos, fn($c) => in_array(Competencias::normalizar($c), $grandes, true)));
             if ($principais) return implode(' / ', array_slice($principais, 0, 3));
         }
@@ -660,7 +691,9 @@ final class ExtracaoVaga {
 
     // ------------------------------------------------------------------ empresa, contato, salário, local
 
-    private static function anunciante(string $tudo, array $linhas, array $destaques, array $repetidas = []): string {
+    /** @param array<string,bool> $emSecao linhas (normalizadas) de requisitos/benefícios: não são nome de empresa
+     *  @param string $bruto texto do OCR sem limpeza (o "&" de "& FACE" fica) */
+    private static function anunciante(string $tudo, array $linhas, array $destaques, array $repetidas = [], array $emSecao = [], string $bruto = ''): string {
         $n = ' '.Competencias::normalizar($tudo).' ';
         // 1) Marcas conhecidas.
         foreach (self::MARCAS as $m) if (str_contains($n, ' '.Competencias::normalizar($m).' ')) return $m;
@@ -671,7 +704,43 @@ final class ExtracaoVaga {
             '/^([\p{Lu}][\p{L}\'’&.]*(?:\s+(?:d[aeo]s?\s+)?[\p{Lu}][\p{L}\'’&.]*){0,3})\s+-\s+[\p{L}\s]+\/(?:DF|GO)\s+est[aá]/mu',
         ];
         foreach ($pad as $rx) if (preg_match($rx, $tudo, $m)) { $nome = self::nomeEmpresa($m[1]); if ($nome !== '') return $nome; }
-        // 2b) Nome repetido no cartaz (logo no topo e no rodapé: "DOM CASERO" … "DOM CASERO"): 2 a 4 palavras em
+        // 2b) Logotipo confirmado pelo e-mail do cartaz: "SMILE" + "& FACE" … admsmileface@gmail.com → "Smile & Face".
+        //     Linhas curtas cujas letras aparecem ENCOSTADAS no e-mail (ou uma de 2+ palavras), 6+ letras no total.
+        if (preg_match_all('/\b([a-z0-9._-]{4,})@([a-z0-9-]+)\./i', self::corrigirEmails($tudo), $ms, PREG_SET_ORDER)) {
+            $emails = [];
+            foreach ($ms as $m) {
+                $emails[] = strtolower(preg_replace('/[^a-z0-9]/i', '', $m[1]) ?? '');
+                if (!preg_match('/^(gmail|hotmail|outlook|yahoo|live|icloud|bol|uol|terra)$/i', $m[2])) $emails[] = strtolower($m[2]);
+            }
+            $brutas = array_values(array_filter(array_map('trim', explode("\n", $bruto !== '' ? $bruto : $tudo)), fn($l) => $l !== ''));
+            $curta = fn(string $l) => $l === mb_strtoupper($l) && !preg_match('/[\d@:]/', $l) && str_word_count(Competencias::normalizar($l)) <= 3
+                && !preg_match('/\b(vagas?|curriculos?|contato|rh|email|envie|whatsapp|candidatura|vendas|loja|comercial|atendimento|selecao|recrutamento|trabalhe|empregos?)\b/', Competencias::normalizar($l));
+            // Pedaços do logotipo achados no e-mail, pela posição: "mimoria"(0) + "business"(7) → encostados → um nome só.
+            $pecas = [];
+            foreach ($brutas as $l) {
+                $junto = str_replace(' ', '', Competencias::normalizar($l));
+                if (!$curta($l) || strlen($junto) < 4) continue;
+                foreach ($emails as $e => $em) {
+                    $pos = strpos($em, $junto);
+                    if ($pos !== false && !isset($pecas[$e][$pos])) $pecas[$e][$pos] = [$l, strlen($junto)];
+                }
+            }
+            foreach ($pecas as $lista) {
+                ksort($lista);
+                $melhor = null;
+                foreach ($lista as $pos => [$l, $tam]) {
+                    $partes = [$l]; $fimPeca = $pos + $tam; $total = $tam;
+                    while (isset($lista[$fimPeca]) && count($partes) < 3) { $partes[] = $lista[$fimPeca][0]; $total += $lista[$fimPeca][1]; $fimPeca += $lista[$fimPeca][1]; }
+                    // Um pedaço só precisa ter 2+ palavras ("DOM CASERO"); juntando pedaços, 6+ letras.
+                    $ok = count($partes) > 1 ? $total >= 6 : str_word_count(Competencias::normalizar($l)) >= 2 && $total >= 6;
+                    if ($ok && (!$melhor || $total > $melhor[1])) $melhor = [implode(' ', $partes), $total];
+                }
+                if (!$melhor) continue;
+                $nome = self::nomeEmpresa($melhor[0]);
+                if ($nome !== '' && !self::ehPonto(Competencias::normalizar($nome))) return $nome;
+            }
+        }
+        // 2c) Nome repetido no cartaz (logo no topo e no rodapé: "DOM CASERO" … "DOM CASERO"): 2 a 4 palavras em
         //     maiúsculas, sem números, que não sejam cargo, rótulo ou palavra-chave de vaga, lido 2+ vezes.
         $contagem = [];
         foreach ($repetidas as $l) {
@@ -681,8 +750,9 @@ final class ExtracaoVaga {
             // Toda palavra do nome com 3+ letras (ou "de/da/do/e/&"): "RO LUGAR" é pedaço de "EM PRIMEIRO LUGAR", não empresa.
             $pedaco = (bool)array_filter(preg_split('/\s+/u', $k) ?: [], fn($w) => mb_strlen($w) < 3 && !in_array($w, ['de', 'da', 'do', 'e'], true));
             if ($pedaco || $palavras < 2 || $palavras > 4 || preg_match('/\d/', $l) || $l !== mb_strtoupper($l) || self::ehCargo($l) || preg_match(self::GENERICOS, $k)
+                || self::ehPonto($k) || self::ehLocalSolto($k) || isset($emSecao[$k]) || self::ehSlogan($l) || str_contains($l, ",")
                 || preg_match(self::PALAVRAS_BENEFICIO, $k) || preg_match(self::PALAVRAS_REQUISITO, $k) || preg_match(self::PALAVRAS_HORARIO, $k)
-                || preg_match('/\b(vaga|vagas|local|locais|trabalho|curriculo|whatsapp|contato|envie|time|equipe|emprego|formato|clt|pj|brasilia|df)\b/', $k)) continue;
+                || preg_match('/\b(vaga|vagas|local|locais|trabalho|curriculo|whatsapp|contato|envie|time|equipe|emprego|formato|clt|pj|brasilia|df|junior|pleno|senior|jr|sr)\b/', $k)) continue;
             $contagem[$k] = [($contagem[$k][0] ?? 0) + 1, $contagem[$k][1] ?? $l];
         }
         uasort($contagem, fn($a, $b) => $b[0] <=> $a[0]);
@@ -717,6 +787,7 @@ final class ExtracaoVaga {
         // Corta onde a frase continua: "Cantón Restaurante está…" → "Cantón Restaurante".
         $s = preg_replace('/\s+(?!(?:de|da|do|das|dos|di|e)\b)\p{Ll}.*$/u', '', $s) ?? $s;
         if ($s === '' || mb_strlen($s) > 50 || str_contains($s, ':') || self::ehCargo($s) || preg_match(self::GENERICOS, Competencias::normalizar($s))) return '';
+        if (preg_match('/\b(de|da|do|das|dos|e|em|para|com|a|o)$/', Competencias::normalizar($s))) return ''; // "TIPO DE" (de "TIPO DE CONTRATO:")
         return self::caixa($s);
     }
 
@@ -758,13 +829,21 @@ final class ExtracaoVaga {
                 $depois = Competencias::normalizar(substr($t, $m[1][1] + strlen($m[1][0]), 25));
                 // Valores que não são o salário: benefícios, adicionais, metas e "pode chegar a".
                 // (a palavra-chave vale se não houver outro valor "R$ ..." entre ela e este)
-                if (preg_match_all('/\b(vr|vt|va|vale|refeicao|alimentacao|comissao|comissoes|bonus|ajuda|diaria|por dia|hora|periculosidade|adicional|auxilio|reembolso|premiacao|premio|indicacao|chegar a|chegar ate|ganhar|mobilidade|transporte|plano|passagem|desconto|cerca de)\b/', $antes, $km, PREG_OFFSET_CAPTURE)
-                    && !preg_match('/\br \d/', substr($antes, (int)end($km[0])[1]))) continue;
+                if (preg_match_all('/\b(vr|vt|va|vale|refeicao|alimentacao|comissao|comissoes|bonus|ajuda|diaria|por dia|hora|periculosidade|adicional|auxilio|reembolso|premiacao|premio|indicacao|chegar a|chegar ate|ganhar|mobilidade|transporte|plano|passagem|desconto|cerca de)\b/', $antes, $km, PREG_OFFSET_CAPTURE)) {
+                    $ult = end($km[0]);
+                    // "R$ 700,00 VT/VR" logo antes: a sigla é do valor anterior, não deste ("… VT/VR  ESTÁGIO: R$ 1.000").
+                    $doAnterior = preg_match('/\br \d[\d ]*(?:\s*\b(?:vt|vr|va)\b)+$/', substr($antes, 0, (int)$ult[1] + strlen($ult[0])));
+                    if (!$doAnterior && !preg_match('/\br \d/', substr($antes, (int)$ult[1]))) continue;
+                }
                 if (preg_match('/^\s*(por dia|dia|ao dia|por km|mes|mensal de vale|de vale|ou mais)\b/', $depois)) continue;
+                // "R$ 700,00 VT/VR" é o valor do vale; "R$ 1.900,00 + VT" é o salário mais o vale (o "+" separa).
+                if (preg_match('/^\s*(?:VT|VR|VA)\b/iu', substr($t, $m[1][1] + strlen($m[1][0]), 12))) continue;
                 $v = decimal_ou_null($m[1][0]);
                 if ($v === null || $v < 500 || $v > 30000) continue;
                 // "sal[a-z]{1,4}rio": aceita o "salário" mal lido pelo OCR ("saLÁário" → "salaario").
-                $candidatos[] = ['v' => $v, 'forte' => (bool)preg_match('/\b(sal[a-z]{1,4}rio|remuneracao|bolsa|fixo|base|ganhos?|mensal)\b/', $antes.' '.Competencias::normalizar($m[0][0]))];
+                // "CLT: R$ 2.200" / "ESTÁGIO: R$ 1.000": valor com o regime logo antes também é salário declarado.
+                $candidatos[] = ['v' => $v, 'forte' => (bool)preg_match('/\b(sal[a-z]{1,4}rio|remuneracao|bolsa|fixo|base|ganhos?|mensal)\b/', $antes.' '.Competencias::normalizar($m[0][0]))
+                    || (bool)preg_match('/\b(clt|pj|estagio|estagiario|efetivo|temporario)\s*$/', $antes)];
             }
         }
         if (!$candidatos) return [null, null];

@@ -24,13 +24,35 @@ document.addEventListener('DOMContentLoaded',()=>{
     try{ const q=qrcode(0,'M'); q.addData(el.dataset.qrcode); q.make(); el.innerHTML=q.createSvgTag({cellSize:4,margin:8,scalable:true}); }catch(e){}
   });
 
+  // Carregador das máquinas de extração: AMARELO enquanto o envio/leitura está em andamento (o próximo resultado
+  // aparece AZUL, "Pronto"). Também impede o envio duplo: os botões ficam travados até a página responder.
+  const carregador=(form,texto)=>{
+    let c=form.querySelector('[data-carregador]');
+    if(!c){
+      c=document.createElement('div'); c.className='carregador'; c.dataset.carregador=''; c.setAttribute('role','status'); c.setAttribute('aria-live','polite');
+      c.innerHTML='<div class="carregador-trilho"><span class="carregador-barra"></span></div><span class="carregador-texto"></span>';
+      const acoes=form.querySelector('.form-actions'); if(acoes) acoes.before(c); else form.append(c);
+    }
+    c.hidden=false; c.className='carregador carregando indeterminado'; c.querySelector('.carregador-texto').textContent=texto;
+  };
+  document.querySelectorAll('form[data-carregando]').forEach(form=>form.addEventListener('submit',ev=>{
+    if(form.dataset.enviando){ ev.preventDefault(); return; }
+    form.dataset.enviando='1'; carregador(form,form.dataset.carregando);
+    setTimeout(()=>form.querySelectorAll('button').forEach(b=>b.disabled=true),0); // depois do envio: o botão clicado segue junto
+  }));
+  window.addEventListener('pageshow',ev=>{ if(!ev.persisted) return; // voltou pelo "voltar" do navegador: destrava
+    document.querySelectorAll('form[data-enviando]').forEach(form=>{ delete form.dataset.enviando; form.querySelectorAll('button').forEach(b=>b.disabled=false);
+      const c=form.querySelector('[data-carregador]'); if(c) c.hidden=true; });
+  });
+
   // Máquina de extração: ao escolher o cartaz, mostra a prévia e já envia para leitura (sem clique extra).
+  // Com o leitor de cartaz da plataforma ativo (leitor-cartaz.js), quem lê e envia é ele.
   document.querySelectorAll('[data-auto-envio]').forEach(inp=>inp.addEventListener('change',()=>{
-    const f=inp.files&&inp.files[0], form=inp.form; if(!f||!form) return;
+    const f=inp.files&&inp.files[0], form=inp.form; if(!f||!form||form.dataset.leitor) return;
     const prev=form.querySelector('[data-previa]');
     if(prev&&f.type.startsWith('image/')){ prev.src=URL.createObjectURL(f); prev.hidden=false; }
-    const aviso=form.querySelector('[data-lendo]'); if(aviso) aviso.hidden=false;
-    const btn=form.querySelector('button'); if(btn){ btn.disabled=true; btn.textContent='Lendo o cartaz…'; }
+    carregador(form,'Enviando o cartaz para leitura…');
+    const extrator=form.closest('.extrator')||form; extrator.querySelectorAll('button').forEach(b=>b.disabled=true);
     form.submit();
   }));
 

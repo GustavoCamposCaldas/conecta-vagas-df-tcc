@@ -14,8 +14,14 @@ declare(strict_types=1);
  *  3. linhas com confiança baixa (ruído de fundo, ícones, fotos) são descartadas;
  *  4. as linhas escritas com as maiores letras viram "destaques" (o título do cartaz).
  *
- * Instalação no Windows: https://github.com/UB-Mannheim/tesseract/wiki (marcar o idioma
- * português). No Linux: apt install tesseract-ocr tesseract-ocr-por.
+ * LEITOR DA PLATAFORMA (padrão): as 4 leituras são feitas NO NAVEGADOR de quem envia o cartaz, pelo Tesseract.js
+ * que vem com o site (public/assets/js/leitor-cartaz.js + assets/js/vendor/tesseract) — nada para instalar no
+ * servidor. O navegador manda os TSVs junto com o cartaz (leiturasDoNavegador) e o resultado é montado aqui,
+ * com a mesma calibragem (montar).
+ *
+ * Tesseract no servidor: OPCIONAL, só reserva para quando o navegador não conseguiu ler.
+ * Windows: https://github.com/UB-Mannheim/tesseract/wiki (marcar o idioma português).
+ * Linux: apt install tesseract-ocr tesseract-ocr-por.
  */
 final class OcrImagem {
     /** Largura (px) para a qual a imagem é ampliada antes da leitura. */
@@ -24,6 +30,8 @@ final class OcrImagem {
     private const CONFIANCA_LINHA = 55;
     /** Maior imagem aceita (pixels), antes e depois da ampliação: no GD cada pixel ocupa 4 bytes de memória. */
     private const MAX_PIXELS = 40_000_000;
+    /** Maior leitura (TSV) aceita do navegador, em bytes: um cartaz cheio de texto gera ~100 KB. */
+    private const MAX_TSV = 1_500_000;
 
     /** Caminho do executável do Tesseract (null = não instalado). */
     public static function comando(): ?string {
@@ -84,6 +92,24 @@ final class OcrImagem {
             @unlink($tmp);
             if ($neg) @unlink($neg);
         }
+    }
+
+    /**
+     * Leituras feitas NO NAVEGADOR pelo leitor da plataforma (os mesmos 4 TSVs: normal psm 3 e 11, negativo psm 3 e 11).
+     * Chegam do formulário (dado do usuário): só aceita uma lista de 1 a 4 textos UTF-8 de tamanho limitado.
+     * O conteúdo equivale a colar o texto do anúncio — o montar() só aproveita linhas no formato do Tesseract.
+     * @return array{0:string,1:string,2:string,3:string}|null null = nada aproveitável (o servidor lê, se puder)
+     */
+    public static function leiturasDoNavegador(mixed $tsvs): ?array {
+        if (!is_array($tsvs) || !$tsvs || count($tsvs) > 4) return null;
+        $out = [];
+        foreach (array_values($tsvs) as $t) {
+            if (!is_string($t) || strlen($t) > self::MAX_TSV || !mb_check_encoding($t, 'UTF-8')) return null;
+            $out[] = str_replace(["\r\n", "\r"], "\n", $t);
+        }
+        // Tem que parecer uma leitura do Tesseract: linhas com as 12 colunas separadas por tabulação.
+        if (!preg_match('/^\d\t(-?[\d.]+\t){10}/m', $out[0])) return null;
+        return array_pad($out, 4, '');
     }
 
     /**

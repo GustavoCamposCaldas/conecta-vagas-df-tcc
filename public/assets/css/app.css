@@ -39,6 +39,20 @@
 .admin-tabs a.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 .extrator{border:1px dashed #93c5fd;background:#f8fbff;border-radius:16px;padding:16px;margin-bottom:18px}
 .extrator summary{cursor:pointer;font-weight:700;color:#1d4ed8}
+/* Carregador das máquinas de extração: AMARELO carregando/lendo, AZUL pronto. */
+.carregador{display:flex;flex-direction:column;gap:6px;margin:10px 0;padding:10px 12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:.9rem;font-weight:600}
+.carregador[hidden]{display:none}
+.btn:disabled,button:disabled{opacity:.55;cursor:progress}
+.carregador-trilho{height:10px;border-radius:999px;overflow:hidden;background:rgba(15,23,42,.1)}
+.carregador-barra{display:block;height:100%;width:4%;border-radius:inherit;background:var(--blue);transition:width .35s ease,background-color .35s ease}
+.carregador.carregando{background:#fffbeb;border-color:#facc15;color:#713f12}
+.carregador.carregando .carregador-barra{background-color:#eab308;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.4) 0 8px,transparent 8px 16px);background-size:22.6px 22.6px;animation:carregador-listras .8s linear infinite}
+.carregador.indeterminado .carregador-barra{width:40%;animation:carregador-listras .8s linear infinite,carregador-vai 1.4s ease-in-out infinite}
+.carregador.pronto{background:#eff6ff;border-color:#93c5fd;color:#1e3a8a}
+.carregador.pronto .carregador-barra{width:100%;background:var(--blue)}
+@keyframes carregador-listras{to{background-position:22.6px 0}}
+@keyframes carregador-vai{0%{margin-left:-40%}100%{margin-left:100%}}
+@media(prefers-reduced-motion:reduce){.carregador .carregador-barra{animation:none!important}.carregador.indeterminado .carregador-barra{width:100%}}
 @media(max-width:900px){.filtros{grid-template-columns:1fr 1fr!important}}
 @media(max-width:560px){.filtros{grid-template-columns:1fr!important}}
 

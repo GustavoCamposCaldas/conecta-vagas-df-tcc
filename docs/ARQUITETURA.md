@@ -198,7 +198,7 @@ feitas na revisão viram lições que a extração passa a usar. Detalhes e rote
 - Aplicação no perfil: campo vazio **recebe** o valor; campo preenchido é **mantido** (a não ser que o candidato
   marque "Substituir"); listas são **mescladas**; o nome da conta só muda se o candidato confirmar no relatório.
 
-**Vagas** (painel → Vagas): envia-se o **cartaz** (imagem, lido por OCR com o Tesseract) ou cola-se o anúncio
+**Vagas** (painel → Vagas): envia-se o **cartaz** (imagem, lido por OCR pelo leitor da plataforma) ou cola-se o anúncio
 (WhatsApp, Instagram, site) e o sistema preenche título, empresa anunciante, salário (ignora VR/VT), cidade, tipo,
 nível, modelo, descrição, requisitos, benefícios, contato, quantidade de vagas e área.
 - A leitura começa ao escolher o arquivo (prévia do cartaz na tela); o cartaz vira a imagem da vaga.
@@ -208,7 +208,15 @@ nível, modelo, descrição, requisitos, benefícios, contato, quantidade de vag
 - A descrição ganha uma frase de abertura montada com o que foi lido ("Grupo Dourado contrata Auxiliar de Cozinha em Águas Claras.").
 - Seções curtas ("Horário:", "Local:") não engolem as linhas seguintes; códigos de vaga "(cód. 1308)", prefixos
   "Temporário -" e frases "está contratando X" são tratados no título.
-- Para ler imagens: Tesseract instalado (com o idioma português) e a extensão `gd` ligada no `php.ini`.
+- **Leitor de cartaz da plataforma — nada para instalar**: o OCR roda no navegador de quem envia o cartaz
+  (`public/assets/js/leitor-cartaz.js` + Tesseract.js 7 em WebAssembly e o português `best_int`, tudo em
+  `public/assets/js/vendor/tesseract/`, servido pelo próprio site). Ele faz as mesmas 4 leituras do servidor (imagem em
+  cinza + gama ampliada para ~2200 px e o negativo, cada uma em psm 3 e 11) e envia os TSVs junto com o cartaz;
+  `OcrImagem::leiturasDoNavegador` valida (1 a 4 textos UTF-8, até 1,5 MB, formato do Tesseract) e `OcrImagem::montar`
+  aplica a mesma calibragem. Leitura forjada ou inválida é ignorada e o servidor lê sozinho.
+- Tesseract **no servidor** é opcional: só é usado quando o navegador não conseguiu ler (sem JavaScript, pouca memória).
+- **Carregador**: amarelo enquanto carrega o leitor ou lê o cartaz (com %), azul quando está pronto; o mesmo
+  carregador aparece em toda máquina de extração (anúncio, fichas de cursos, currículo) e trava o envio duplo.
 - Calibragem do cartaz (`OcrImagem` + `ExtracaoVaga`): as 4 leituras do Tesseract rodam em paralelo (1 thread cada,
   TSV em arquivo, tempo máximo de 90 s; se falhar, uma por uma, e leitura vazia é tentada de novo); cinza e gama são
   aplicados na imagem original antes de ampliar. Na extração: palavra partida pelo OCR é juntada quando aparece
@@ -216,6 +224,11 @@ nível, modelo, descrição, requisitos, benefícios, contato, quantidade de vag
   ("Operador de Máquina Costal (Roçadeira)"); slogans (`SLOGANS`) e restos de logotipo não entram em campo nenhum;
   nome de empresa não aceita pedaço de palavra ("RO LUGAR"); "R$ 48,00 ror DIA" vira "por dia" e o valor por dia
   vai para o vale refeição. O cartaz real que motivou isso é um teste permanente em `tests/smoke.php`.
+  Depois, com o cartaz Smile & Face e o da Mimória (leituras reais do navegador em `tests/amostras/`): shopping ou ponto
+  conhecido ("CONJUNTO NACIONAL") não é empresa; ramo sozinho ("ODONTOLOGIA") não continua o cargo; marca em linhas
+  separadas é confirmada pelo e-mail ("SMILE" + "& FACE" … admsmileface@… → "Smile & Face"); palavra grudada pelo OCR
+  é separada quando outra leitura tem as duas ("CONSULTORDE" → "CONSULTOR DE"); "R$ 700,00 VT/VR" é valor de vale e
+  "CLT: R$ 2.200" / "ESTÁGIO: R$ 1.000" são salários declarados.
 
 **Cursos** (painel → Cursos e e-books): cola-se a divulgação e o sistema preenche título, instituição, link,
 carga horária, gratuito/preço, modalidade, nível, formato e categoria.

@@ -23,6 +23,7 @@ $mantidos = array_values(array_filter($itensRel, fn($i) => in_array($i['status']
 $faltando = array_values(array_filter($itensRel, fn($i) => $i['status'] === 'nao_encontrado'));
 ?>
 <section class="pf-relatorio" aria-labelledby="pf-rel-titulo">
+  <?=carregador_html('Pronto: currículo lido — confira o relatório e aplique o que quiser no perfil.', true)?>
   <div class="pf-rel-topo">
     <div>
       <h2 id="pf-rel-titulo">Relatório da extração do currículo</h2>

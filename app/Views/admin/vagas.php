@@ -19,29 +19,32 @@ $cartazNoForm = !empty($form['imagem']) && str_starts_with((string)$form['imagem
 <div class="form" style="max-width:none">
     <details class="extrator" <?=$extraido || !empty($form['id']) ? '' : 'open'?>>
         <summary>Máquina de extração: envie o cartaz da vaga (imagem) ou cole o anúncio — o formulário é preenchido</summary>
-        <form method="post" enctype="multipart/form-data" class="cartaz-form" style="margin-top:10px">
+        <?php /* Leitor de cartaz da plataforma: o OCR roda no navegador (assets/js/leitor-cartaz.js), sem nada instalado no servidor. */ ?>
+        <form method="post" enctype="multipart/form-data" class="cartaz-form" style="margin-top:10px" data-leitor-cartaz="<?=e(url('assets/js/vendor/tesseract/'))?>">
             <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="ler_cartaz"><input type="hidden" name="id" value="<?=(int)($form['id'] ?? 0)?>">
             <?php if (isAdmin()): ?><input type="hidden" name="perfil_empresa_id" value="<?=(int)($form['perfil_empresa_id'] ?? 0)?>"><?php endif; ?>
             <label for="cartaz">1. Cartaz da vaga (JPG, PNG ou WEBP, até 8 MB) — a leitura começa ao escolher o arquivo</label>
             <input type="file" id="cartaz" name="cartaz" accept="image/jpeg,image/png,image/webp" required data-auto-envio>
             <img data-previa hidden alt="Prévia do cartaz escolhido" class="ex-previa">
-            <p class="small muted" data-lendo hidden role="status">Lendo o cartaz… isso pode levar alguns segundos.</p>
-            <?php if (!$ocrDisponivel): ?><p class="small ex-aviso">Leitura de imagem indisponível neste servidor (Tesseract OCR ou extensão GD do PHP não encontrados): o cartaz será salvo como imagem da vaga, mas os campos precisam ser preenchidos à mão ou pelo texto abaixo.</p><?php endif; ?>
+            <?=carregador_html()?>
+            <?php if (!$ocrDisponivel): ?><noscript><p class="small ex-aviso">Com o JavaScript desligado o leitor de cartaz não roda: o cartaz será salvo como imagem da vaga, mas os campos precisam ser preenchidos à mão ou pelo texto abaixo.</p></noscript><?php endif; ?>
             <div class="form-actions"><button class="btn">Ler cartaz e preencher</button></div>
         </form>
+        <script src="<?=url('assets/js/leitor-cartaz.js')?>?v=1" defer></script>
 
-        <form method="post" style="margin-top:8px">
+        <form method="post" style="margin-top:8px" data-carregando="Extraindo os dados do anúncio…">
             <input type="hidden" name="csrf" value="<?=e(csrf_token())?>"><input type="hidden" name="acao" value="extrair"><input type="hidden" name="id" value="<?=(int)($form['id'] ?? 0)?>">
             <?php if (isAdmin()): ?><input type="hidden" name="perfil_empresa_id" value="<?=(int)($form['perfil_empresa_id'] ?? 0)?>"><?php endif; ?>
             <?php if ($cartazNoForm): ?><input type="hidden" name="imagem_atual" value="<?=e($form['imagem'])?>"><?php endif; ?>
             <label for="texto_anuncio">2. <?=!empty($extraido['texto_ocr']) ? 'Texto lido no cartaz — corrija o que o OCR leu errado e extraia de novo (o cartaz continua como imagem)' : '…ou cole o texto do anúncio (WhatsApp, Instagram, site)'?></label>
-            <textarea id="texto_anuncio" name="texto_anuncio" rows="<?=!empty($extraido['texto_ocr']) ? 10 : 6?>" placeholder="Ex.: VAGA: Vendedor Interno — Taguatinga&#10;Salário: R$ 3.000 a R$ 5.500 + comissões&#10;Requisitos: experiência com vendas, ensino médio&#10;Benefícios: VT + VR"><?=e($textoAnuncio)?></textarea>
+            <textarea id="texto_anuncio" name="texto_anuncio" required rows="<?=!empty($extraido['texto_ocr']) ? 10 : 6?>" placeholder="Ex.: VAGA: Vendedor Interno — Taguatinga&#10;Salário: R$ 3.000 a R$ 5.500 + comissões&#10;Requisitos: experiência com vendas, ensino médio&#10;Benefícios: VT + VR"><?=e($textoAnuncio)?></textarea>
             <div class="form-actions"><button class="btn btn-outline"><?=!empty($extraido['texto_ocr']) ? 'Extrair de novo com o texto corrigido' : 'Extrair dados do anúncio'?></button></div>
         </form>
     </details>
 
     <?php if ($relatorioVaga): ?>
     <section class="pf-relatorio" id="relatorio-extracao" aria-labelledby="ex-rel-titulo">
+        <?=carregador_html(isset($extraido['confianca']) ? 'Pronto: cartaz lido — confira os campos e salve a vaga.' : 'Pronto: anúncio lido — confira os campos e salve a vaga.', true)?>
         <div class="pf-rel-topo">
             <div>
                 <h2 id="ex-rel-titulo">Relatório da extração da vaga</h2>
