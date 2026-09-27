@@ -55,7 +55,7 @@ body.cv .progress{border-radius:3px}
 /* ---------- Página inicial: boas-vindas ---------- */
 .cv-hero{color:#fff;padding:46px 0 42px;background:
   linear-gradient(90deg,#0a2f6ef7 0%,#0b3a8ce6 36%,#0b3a8c80 60%,#0b3a8c10 85%),
-  url('../img/header-bg.png') center 62%/cover #0b3a8c}
+  url('../img/header-bg.jpg') center 62%/cover #0b3a8c}
 .cv-hero h1{margin:0 0 14px;font-size:40px;font-weight:800;line-height:1.1;text-shadow:0 2px 8px #0003}
 .cv-hero h1::after{content:"";display:block;width:88px;height:4px;margin-top:12px;background:var(--cv-dourado);border-radius:2px}
 .cv-hero p{max-width:640px;margin:0 0 8px;font-size:17px;color:#e8f0ff}
@@ -157,7 +157,7 @@ body.cv .progress{border-radius:3px}
 /* ---------- Faixa de título das páginas internas ---------- */
 .cv-faixa{color:#fff;padding:22px 0 20px;background:
   linear-gradient(90deg,#0a2f6ef7 0%,#0b3a8ce6 45%,#0b3a8c8c 72%,#0b3a8c40),
-  url('../img/header-bg.png') center 62%/cover #0b3a8c}
+  url('../img/header-bg.jpg') center 62%/cover #0b3a8c}
 .cv-faixa h1{margin:0;font-size:28px;line-height:1.2}
 .cv-faixa p{max-width:760px;margin:5px 0 0;color:#dbe7ff}
 .cv-trilha{margin-bottom:6px;font-size:13px;color:#cfe0ff}

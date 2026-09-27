@@ -55,7 +55,7 @@ final class HomeController extends Controller {
             'brasilia4.jpg' => ['Ponte JK — Marinelson Almeida', 'CC BY 2.0', 'https://commons.wikimedia.org/wiki/File:Ponte_JK_-_Lago_Parano%C3%A1_-_Brasilia._(15352509527).jpg'],
             'brasilia5.jpg' => ['Esplanada à noite — Dasfour2022', 'CC BY-SA 4.0', 'https://commons.wikimedia.org/wiki/File:Esplanada_dos_Ministerios_a_noite.jpg'],
         ];
-        $slides = imagens_da_pasta('assets/img/brasilia') ?: ['assets/img/header-bg.png'];
+        $slides = imagens_da_pasta('assets/img/brasilia') ?: ['assets/img/header-bg.jpg'];
 
         $title = 'Início';
         $layoutLargo = true;
