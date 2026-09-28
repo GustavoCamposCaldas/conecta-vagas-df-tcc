@@ -196,4 +196,45 @@ final class PerfilController extends Controller {
         }
         redirect('view/perfil/portfolio.php#match');
     }
+
+    /**
+     * view/perfil/conta_excluir.php (POST) — LGPD: o candidato apaga a PRÓPRIA conta e todos os dados dele
+     * (perfil, currículos e arquivos, foto, candidaturas, matches e as lições que a máquina aprendeu com ele).
+     * Confirma com a senha (mesma tolerância e mesma trava contra tentativas do login) e com a caixa marcada.
+     */
+    public function excluirConta(): void {
+        exigirLogin();
+        if (!isCandidato()) negar_acesso('Acesso negado.');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirect('view/perfil/index.php');
+        validar_csrf();
+
+        $id = (int)$_SESSION['usuario_id'];
+        $dao = new UsuarioDAO();
+        $email = (string)($dao->buscarPorId($id)['email'] ?? '');
+        $voltar = 'view/perfil/index.php#excluir-conta';
+        if ($dao->minutosBloqueioLogin(ip_cliente(), $email) > 0) {
+            flash('erro', 'Muitas senhas erradas. Aguarde alguns minutos e tente de novo.');
+            redirect($voltar);
+        }
+        if (!isset($_POST['confirmo'])) {
+            flash('erro', 'Marque a caixa de confirmação para excluir a conta.');
+            redirect($voltar);
+        }
+        $senha = $_POST['senha'] ?? '';
+        if (!is_string($senha) || !$dao->senhaConfere($id, $senha)) {
+            $dao->registrarFalhaLogin(ip_cliente(), $email);
+            flash('erro', 'Senha incorreta: a conta não foi excluída.');
+            redirect($voltar);
+        }
+        MaquinaAprendizado::esquecerDoUsuario($id);   // as lições de currículo dele saem antes da conta
+        if (!$dao->excluir($id)) {
+            flash('erro', 'Não foi possível excluir a conta agora. Tente de novo em instantes.');
+            redirect($voltar);
+        }
+        // Sessão da conta apagada encerrada; uma sessão nova só para mostrar a confirmação.
+        encerrar_sessao();
+        iniciar_sessao();
+        flash('ok', 'Sua conta e todos os seus dados foram excluídos da plataforma.');
+        redirect('index.php');
+    }
 }

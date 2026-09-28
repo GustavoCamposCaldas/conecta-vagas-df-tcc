@@ -164,5 +164,20 @@
             </div>
         <?php endforeach; endif; ?>
     </div>
+
+    <div class="panel" id="excluir-conta" style="margin-top:18px">
+        <h3>🔒 Seus dados (LGPD)</h3>
+        <p class="meta">Você pode apagar a sua conta quando quiser. Saem juntos o perfil, os currículos e arquivos, a foto, as candidaturas e o match. Não dá para desfazer.</p>
+        <details>
+            <summary style="cursor:pointer; font-weight:700; color:#991b1b;">Excluir minha conta</summary>
+            <form method="post" action="<?=url('view/perfil/conta_excluir.php')?>" style="margin-top:10px">
+                <input type="hidden" name="csrf" value="<?=e(csrf_token())?>">
+                <label for="ex-senha">Digite sua senha para confirmar</label>
+                <input id="ex-senha" type="password" name="senha" required autocomplete="current-password">
+                <div class="check" style="margin-top:10px"><input type="checkbox" name="confirmo" value="1" id="ex-confirmo" required><label for="ex-confirmo" style="font-weight:400">Entendo que a minha conta e os meus dados serão apagados para sempre.</label></div>
+                <div class="form-actions" style="margin-top:12px"><button class="btn btn-sm btn-danger">Excluir minha conta</button></div>
+            </form>
+        </details>
+    </div>
 </aside>
 </div>

@@ -3,7 +3,9 @@
 Plataforma de vagas de emprego e capacitação profissional do Distrito Federal —
 Trabalho de Conclusão de Curso (TCC).
 
-**PHP 8.2 puro (padrão MVC)** · **MySQL/MariaDB (PDO)** · **XAMPP** · sem frameworks e sem dependências externas.
+**PHP 8.0 ou mais novo, puro (padrão MVC)** · **MySQL/MariaDB (PDO)** · **XAMPP** · sem frameworks e sem dependências externas.
+Testado no PHP 8.0.30 do XAMPP; o código não usa recursos do 8.1 em diante. Para publicar na internet, use PHP 8.2
+ou mais novo (o 8.0 não recebe mais correções de segurança).
 
 ## O que o sistema faz
 
@@ -69,8 +71,9 @@ Troque as senhas antes de publicar o sistema.
   ```
   C:\xampp\php\php.exe database\resetar_senhas.php
   ```
-- **"Esqueci minha senha"**: no modo de demonstração (sem e-mail configurado), o link de redefinição fica em
-  `storage/logs/redefinicoes_senha.log`.
+- **"Esqueci minha senha"**: no modo de demonstração (acesso pelo próprio computador, sem e-mail configurado), o
+  link de redefinição aparece na tela e fica em `storage/logs/redefinicoes_senha.log`, com o e-mail mascarado
+  (`ca*******@conectavagas.com`). Com `APP_DEBUG=0` (produção), o link não vai para o log: seria enviado por e-mail.
 
 ## Estrutura de pastas
 
@@ -104,12 +107,15 @@ TCC_GUSTAVO/
 │       └── js/vendor/tesseract/  leitor de cartaz da plataforma (Tesseract.js + português), servido pelo próprio site
 ├── storage/               arquivos gerados pelo sistema (inacessível pelo navegador)
 │   ├── uploads/           currículos, fotos, logos e cartazes enviados
-│   ├── logs/              registros internos (ex.: links de redefinição de senha)
+│   ├── logs/              registros internos (ex.: links de redefinição de senha, só no modo de demonstração)
 │   └── backups/           cópias do banco e dos uploads (fora do git), com COMO_RESTAURAR.txt
 └── tests/
     ├── smoke.php          teste rápido: classes, regras, banco e páginas
+    ├── jornadas.php       o sistema usado como uma pessoa usa: cadastro, login, currículo, candidatura,
+    │                      extração de vagas e cursos, troca de senha e exclusão da conta (conta temporária)
+    ├── amostras/          leituras reais de cartazes feitas pelo leitor do navegador (usadas nos testes)
     ├── lint.php           confere a sintaxe de todos os arquivos PHP
-    └── verificar.bat      clique duplo: sintaxe + teste rápido, com o resultado na tela
+    └── verificar.bat      clique duplo: sintaxe + teste rápido + jornadas, com o resultado na tela
 ```
 
 ## Como uma página é montada
@@ -159,11 +165,13 @@ perfil; se o perfil já tiver foto, a do currículo aparece no relatório para o
 
 ## Blindagem do código (antes e depois de mexer)
 
-- **Clique duplo em `tests\verificar.bat`**: confere a sintaxe de todos os PHP e roda o teste rápido. No fim
+- **Clique duplo em `tests\verificar.bat`**: confere a sintaxe de todos os PHP, roda o teste rápido e as jornadas
+  (`tests/jornadas.php`: uma conta temporária faz cadastro, login, currículo, candidatura e exclusão da conta pelo
+  navegador, e é apagada no fim — nada fica no banco). No fim
   aparece **TUDO CERTO** ou o que quebrou (com arquivo e linha). Faça isso depois de cada alteração.
 - **Commit protegido**: o gancho `.githooks/pre-commit` roda a mesma verificação antes de cada commit (pelo
-  terminal ou pelo VS Code). Se algo quebrou, o commit é **barrado** e o motivo aparece; o relatório completo
-  fica em `.git/smoke_ultimo.txt`. Precisa do Apache e do MySQL ligados. Emergência: `git commit --no-verify`.
+  terminal ou pelo VS Code). Se algo quebrou, o commit é **barrado** e o motivo aparece; os relatórios completos
+  ficam em `.git/smoke_ultimo.txt` e `.git/jornadas_ultimo.txt`. Precisa do Apache e do MySQL ligados. Emergência: `git commit --no-verify`.
 - O gancho já está ligado nesta máquina. Em uma cópia nova do projeto, ligue com:
   ```
   git config core.hooksPath .githooks
@@ -181,6 +189,9 @@ perfil; se o perfil já tiver foto, a do currículo aparece no relatório para o
   documentos, `.git` e arquivos ocultos respondem 403.
 - Cabeçalhos: `Content-Security-Policy` (formulários só para o próprio site), `X-Frame-Options`,
   `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`; a versão do PHP não é anunciada.
+- **LGPD**: consentimento no cadastro; o candidato exclui a própria conta em **Meu perfil → Seus dados → Excluir
+  minha conta** (confirma com a senha) — saem o perfil, os currículos e arquivos, a foto, as candidaturas, o match,
+  as tentativas de login e as lições que a máquina aprendeu com ele. Os logs não guardam e-mail inteiro.
 - Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) (seção de segurança).
 
 ## Backup e restauração

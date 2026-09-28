@@ -2,9 +2,10 @@
 # ============================================================
 # BLINDAGEM DO CÓDIGO — roda sozinho antes de cada commit (git, VS Code, qualquer cliente).
 # 1. confere a sintaxe de todos os arquivos PHP (tests/lint.php);
-# 2. roda o teste rápido (tests/smoke.php: regras, banco e páginas — Apache e MySQL ligados).
-# Se algo falhar, o commit NÃO é feito e aparece o motivo. O relatório completo do teste fica em
-# .git/smoke_ultimo.txt. Emergência (ex.: XAMPP desligado): git commit --no-verify
+# 2. roda o teste rápido (tests/smoke.php: regras, banco e páginas — Apache e MySQL ligados);
+# 3. roda as jornadas (tests/jornadas.php: cadastro, login, currículo, candidatura, extração e exclusão de conta).
+# Se algo falhar, o commit NÃO é feito e aparece o motivo. Os relatórios completos ficam em
+# .git/smoke_ultimo.txt e .git/jornadas_ultimo.txt. Emergência (ex.: XAMPP desligado): git commit --no-verify
 # Ativado com: git config core.hooksPath .githooks
 # ============================================================
 PHP="/c/xampp/php/php.exe"
@@ -24,4 +25,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 grep -E "RESULTADO" .git/smoke_ultimo.txt
+
+echo "Blindagem: rodando as jornadas (tests/jornadas.php)..."
+"$PHP" tests/jornadas.php > .git/jornadas_ultimo.txt 2>&1
+if [ $? -ne 0 ]; then
+    grep -E "FALHA|RESULTADO" .git/jornadas_ultimo.txt
+    echo ""
+    echo "COMMIT BLOQUEADO: uma jornada falhou. Relatorio completo: .git/jornadas_ultimo.txt"
+    exit 1
+fi
+grep -E "RESULTADO" .git/jornadas_ultimo.txt
 exit 0

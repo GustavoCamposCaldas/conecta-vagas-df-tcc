@@ -42,6 +42,9 @@ MaquinaAprendizado::ligar(false);
 confere('decimal_ou_null("1.234,56") = 1234.56', decimal_ou_null('1.234,56') === 1234.56);
 confere('salario_texto(1900, 2500)', salario_texto(1900, 2500) === 'R$ 1.900,00 a R$ 2.500,00');
 confere('rotulo("em_analise") = "Em análise"', rotulo('em_analise') === 'Em análise');
+confere('mascarar_email: log sem o e-mail inteiro (LGPD)', mascarar_email('Candidato@ConectaVagas.com') === 'ca*******@conectavagas.com'
+    && mascarar_email('ab@x.com') === 'a*@x.com' && mascarar_email('sem-arroba') === '********', mascarar_email('Candidato@ConectaVagas.com'));
+confere('UsuarioDAO::senhaConfere: conta inexistente ou senha vazia nunca confere', !(new UsuarioDAO())->senhaConfere(0, 'Admin@123') && !(new UsuarioDAO())->senhaConfere(1, ''));
 confere('caminho_upload() aceita só uploads simples', caminho_upload('assets/uploads/foto_1.png') === UPLOAD_DIR.'foto_1.png'
     && caminho_upload('assets/uploads/../config/config.php') === null && caminho_upload('config/config.php') === null);
 confere('caminho_imagem_valido() bloqueia ".."', caminho_imagem_valido('assets/img/vagas/vaga1.jpg') !== '' && caminho_imagem_valido('assets/img/../../x.png') === '');

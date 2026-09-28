@@ -6,7 +6,7 @@
 ?>
 <div class="form">
 <h1>Recuperar senha</h1>
-<div class="notice small"><b>Recurso demonstrativo:</b> este ambiente local não envia e-mails. O link de redefinição fica registrado no servidor, em <code>storage/logs/redefinicoes_senha.log</code><?=DEBUG ? ', e é mostrado nesta tela quando o acesso é feito pelo próprio computador (modo DEBUG)' : ''?>. Em produção, ele seria enviado para o e-mail da conta.</div>
+<div class="notice small"><b>Recurso demonstrativo:</b> este ambiente não envia e-mails. No modo de demonstração (DEBUG), o link de redefinição fica registrado no servidor, em <code>storage/logs/redefinicoes_senha.log</code> (com o e-mail mascarado), e aparece nesta tela quando o acesso é feito pelo próprio computador. Em produção, ele seria enviado para o e-mail da conta e não fica registrado em lugar nenhum.</div>
 <?php if ($enviado): ?>
     <div class="alert ok">Se o e-mail informado estiver cadastrado e ativo, um link de redefinição válido por <?=(int)UsuarioDAO::REDEFINICAO_MINUTOS?> minutos foi gerado.</div>
     <?php if ($linkDemo): ?>

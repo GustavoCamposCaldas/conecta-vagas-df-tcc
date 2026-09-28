@@ -322,13 +322,23 @@ final class UsuarioDAO {
         }
     }
 
+    /** A senha digitada é a desta conta? Mesma tolerância do login (espaços nas pontas, 1ª letra trocada, Caps Lock). */
+    public function senhaConfere(int $id, string $senha): bool {
+        $u = $this->buscarPorId($id);
+        if (!$u || $senha === '') return false;
+        foreach (self::variantesSenha($senha) as $v) if (password_verify($v, (string)$u['senha'])) return true;
+        return false;
+    }
+
     /**
-     * Exclui a conta; perfil, currículos, candidaturas, vagas, matches e assinaturas saem em cascata (FKs).
-     * Remove também os arquivos enviados (currículos, foto/logo e imagens de vagas enviadas).
+     * Exclui a conta; perfil, currículos, candidaturas, vagas, matches, assinaturas e pedidos de troca de senha
+     * saem em cascata (FKs). Remove também os arquivos enviados (currículos, foto/logo e imagens de vagas enviadas)
+     * e as tentativas de login guardadas pelo e-mail (LGPD: nada da pessoa fica para trás).
      */
     public function excluir(int $id): bool {
         try {
             $db = Database::getConexao();
+            $email = (string)($this->buscarPorId($id)['email'] ?? '');
             $s = $db->prepare("SELECT cv.arquivo_pdf FROM curriculos cv JOIN perfis p ON p.id=cv.perfil_id WHERE p.usuario_id=?
                                UNION SELECT foto FROM perfis WHERE usuario_id=? AND foto IS NOT NULL
                                UNION SELECT v.imagem FROM vagas v JOIN perfis p ON p.id=v.perfil_empresa_id WHERE p.usuario_id=? AND v.imagem LIKE 'assets/uploads/%'");
@@ -338,6 +348,7 @@ final class UsuarioDAO {
             $d->execute([$id]);
             if ($d->rowCount() < 1) return false;
             foreach ($arquivos as $a) apagar_upload_sem_uso((string)$a);
+            if ($email !== '') $db->prepare("DELETE FROM tentativas_login WHERE email=?")->execute([$email]);
             return true;
         } catch (Throwable) {
             return false;

@@ -142,6 +142,7 @@ Definida em `public/index.php`. As rotas aceitam GET (mostrar) e POST (enviar fo
 | `view/perfil/salvar.php` | `PerfilController::salvar` | — (redireciona) | candidato |
 | `view/perfil/portfolio.php[?id=]` | `PerfilController::portfolio` | `perfil/portfolio` | dono; outros se o perfil for público |
 | `view/perfil/recalcular_match.php` | `PerfilController::recalcularMatch` | — | candidato |
+| `view/perfil/conta_excluir.php` | `PerfilController::excluirConta` | — | candidato |
 | `view/perfil/curriculo_upload.php` | `CurriculoController::upload` | — | candidato |
 | `view/perfil/aplicar_extracao.php` | `CurriculoController::aplicarExtracao` | — | candidato |
 | `view/perfil/curriculo_excluir.php` | `CurriculoController::excluir` | — | candidato |
@@ -404,6 +405,16 @@ volta para a mesma lista filtrada (`volta_filtros()`).
 - Cabeçalhos: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`.
 - Empresa bloqueada: as vagas dela saem da área pública e deixam de receber candidaturas.
 - Candidatura cancelada: a empresa perde o acesso ao contato e ao currículo daquele candidato (LGPD).
+- **Exclusão da conta pelo candidato (LGPD)**: `PerfilController::excluirConta` (POST, CSRF) pede a senha — mesma
+  tolerância e mesma pausa contra tentativas do login (`UsuarioDAO::senhaConfere`) — e a caixa de confirmação.
+  Antes de apagar, `MaquinaAprendizado::esquecerDoUsuario` tira as lições de currículo dele do modelo; depois
+  `UsuarioDAO::excluir` apaga a conta (perfil, currículos, candidaturas, matches, assinaturas e pedidos de troca de
+  senha em cascata), os arquivos enviados e as tentativas de login do e-mail. As outras sessões abertas da conta
+  caem sozinhas (`revalidar_sessao`). Empresas pedem a exclusão ao administrador.
+- Log de troca de senha só no modo de demonstração (`DEBUG`), com o e-mail mascarado (`mascarar_email`).
+- **Jornadas** (`tests/jornadas.php`, também no gancho de commit): uma conta temporária percorre pelo HTTP
+  cadastro, saída/login, currículo DOCX, candidatura, extração de vagas e cursos, troca de senha e exclusão da
+  conta; tudo o que ela cria é apagado no fim, mesmo se um passo falhar.
 - Buscas com `LIKE` tratam `%` e `_` digitados como texto (`like()`); visualização de vaga conta 1 vez por visitante.
 
 **Doação (rodapé)**: com `DOACAO_PIX_CHAVE` preenchida em `config/config.php`, o rodapé mostra o QR Code Pix

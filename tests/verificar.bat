@@ -2,7 +2,7 @@
 chcp 65001 >nul
 rem ============================================================
 rem VERIFICACAO COMPLETA - clique duas vezes neste arquivo.
-rem Confere a sintaxe de todos os PHP e roda o teste rapido (Apache e MySQL ligados no XAMPP).
+rem Confere a sintaxe de todos os PHP, roda o teste rapido e as jornadas (Apache e MySQL ligados no XAMPP).
 rem ============================================================
 cd /d "%~dp0.."
 echo.
@@ -11,6 +11,8 @@ echo.
 C:\xampp\php\php.exe tests\lint.php
 if errorlevel 1 goto erro
 C:\xampp\php\php.exe tests\smoke.php
+if errorlevel 1 goto erro
+C:\xampp\php\php.exe tests\jornadas.php
 if errorlevel 1 goto erro
 echo.
 echo TUDO CERTO: pode usar e fazer commit.

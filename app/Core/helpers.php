@@ -144,6 +144,16 @@ function trim_u(string $s, string $chars = " \t\n\r\0\x0B", string $lado = 'ambo
 /** E-mail sempre em minúsculas e sem espaços (é assim que fica gravado no banco). */
 function normalizar_email(string $email): string { return strtolower(trim($email)); }
 
+/** E-mail para log sem expor a pessoa (LGPD): "candidato@site.com" → "ca*******@site.com". */
+function mascarar_email(string $email): string {
+    $email = normalizar_email($email);
+    $arroba = strrpos($email, '@');
+    if ($arroba === false) return str_repeat('*', min(8, mb_strlen($email)));
+    $usuario = substr($email, 0, $arroba);
+    $mostra = mb_strlen($usuario) > 3 ? 2 : 1;
+    return mb_substr($usuario, 0, $mostra).str_repeat('*', max(1, mb_strlen($usuario) - $mostra)).substr($email, $arroba);
+}
+
 /** URL externa segura para links (só http/https; bloqueia javascript:, data: etc.). */
 function url_http_valida(string $u): bool {
     return filter_var($u, FILTER_VALIDATE_URL) !== false && preg_match('#^https?://#i', $u) === 1;
