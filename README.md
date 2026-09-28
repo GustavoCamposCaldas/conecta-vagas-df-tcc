@@ -18,6 +18,39 @@ ou mais novo (o 8.0 não recebe mais correções de segurança).
 
 Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premium**.
 
+## Novidades desta versão (27/09/2026)
+
+- **Leitor de cartaz sem instalação**: o OCR roda no navegador (Tesseract.js servido pelo próprio site). Ninguém
+  instala nada, nem no servidor nem no computador; o Tesseract do servidor virou reserva opcional.
+- **Carregador**: amarelo enquanto carrega ou lê (com %), azul quando está pronto, em toda máquina de extração;
+  também impede o clique duplo. O "Extrair" com a caixa vazia não gera mais relatório em branco.
+- **Cartaz mais bem lido**: shopping não vira empresa, marca em linhas separadas é confirmada pelo e-mail do
+  cartaz ("Smile & Face"), palavra grudada pelo OCR é separada, "R$ 700 VT/VR" não conta como salário e até
+  3 cargos em letra grande entram no título.
+- **Biblioteca de e-books**: da pesquisa direto para o botão **Baixar**. A ficha tem o campo `PDF:`; ao salvar,
+  o sistema baixa o PDF (ou acha o PDF na página do e-book) e credita a fonte original. O botão
+  **Trazer os PDFs para a biblioteca** traz os antigos de uma vez.
+- **LGPD**: o candidato exclui a própria conta e todos os dados dele (Meu perfil → Seus dados); o log de troca de
+  senha só existe no modo de demonstração e com o e-mail mascarado.
+- **Testes de jornada** (`tests/jornadas.php`): uma conta temporária usa o sistema pelo navegador — cadastro,
+  login, currículo, candidatura, extração, troca de senha e exclusão da conta — e é apagada no fim. Roda antes de
+  cada commit, junto da sintaxe e do teste rápido.
+- **Correções**: erro no cadastro em lote de e-books (recurso do PHP 8.1 no XAMPP 8.0), entrega de PDF grande em
+  internet lenta, prévia do cartaz quebrada, importação do banco no PowerShell e versão do PHP no README.
+
+**Varredura final (27/09/2026)**: 1.701 páginas rastreadas nos 4 perfis sem nenhum problema; teste rápido 119/119;
+jornadas 18/18; bateria de segurança (XSS, SQL injection, CSRF, sessão, uploads, permissões) aprovada; 114/114
+tabelas íntegras; nenhum erro de PHP no servidor; páginas sem transbordar no celular. Ressalvas conhecidas, para
+depois da banca: ajustes de acessibilidade (pulos de título, rótulos de alguns campos) e ícone da aba (favicon).
+
+## Dia da apresentação (roteiro rápido)
+
+1. Notebook **na tomada** (na bateria o processador desacelera e o leitor de cartaz leva o dobro do tempo).
+2. XAMPP: **Start** no Apache e no MySQL.
+3. Clique duplo em `tests\verificar.bat` e espere **TUDO CERTO**.
+4. Abra uma vez **Painel → Vagas** (o leitor de cartaz fica carregado e fica azul).
+5. Ao terminar: **Stop** no MySQL antes de fechar o XAMPP ou desligar o computador.
+
 ## Instalação (XAMPP no Windows)
 
 1. Copie a pasta do projeto para `C:\xampp\htdocs\` (qualquer nome, inclusive com espaços).
