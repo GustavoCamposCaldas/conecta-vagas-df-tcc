@@ -1,0 +1,24 @@
+@startuml
+!include estilo.iuml
+mainframe sd Cadastrar conta
+autonumber "0:"
+hide footbox
+
+actor Visitante as V
+boundary ":TelaCadastro" as T
+control ":AuthController" as C
+entity ":UsuarioDAO" as U
+entity ":PerfilDAO" as P
+V -> T ++ : solicitar formulário de cadastro
+T --> V : exibir formulário
+V -> T : preencher dados e aceitar termo LGPD
+T -> C ++ : cadastro(dados)
+C -> C : validar nome, e-mail, senha e aceite
+C -> U ++ : cadastrar(UsuarioDTO)
+U -> P ++ : criar(usuarioId)
+P --> U -- : perfilId
+U --> C -- : usuarioId
+C -> C : iniciar_sessao_usuario()
+C --> T -- : "Cadastro realizado com sucesso!"
+T --> V -- : exibir perfil
+@enduml

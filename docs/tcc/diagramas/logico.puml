@@ -1,0 +1,234 @@
+@startuml
+!include estilo.iuml
+mainframe Modelo Lógico — conecta_vagas_df_v2 (MySQL/MariaDB)
+hide circle
+skinparam linetype ortho
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassHeaderBackgroundColor #BDD7EE
+skinparam ClassFontStyle bold
+skinparam nodesep 40
+skinparam ranksep 60
+entity usuarios {
+  PK <b>id</b> : INT(11)
+  --
+  nome : VARCHAR(255) NN
+  email : VARCHAR(255) NN UQ
+  senha : VARCHAR(255) NN
+  tipo : ENUM(...) NN
+  telefone : VARCHAR(30)
+  ativo : TINYINT(1) NN
+  ultimo_acesso : DATETIME
+  created_at : DATETIME NN
+}
+entity perfis {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>usuario_id</i> : INT(11) NN UQ
+  titulo_profissional : VARCHAR(255)
+  bio : TEXT
+  data_nascimento : DATE
+  cidade : VARCHAR(100)
+  uf : VARCHAR(2)
+  nome_fantasia : VARCHAR(255)
+  cnpj : VARCHAR(20)
+  setor : VARCHAR(100)
+  site : VARCHAR(255)
+  habilidades : TEXT
+  experiencias : TEXT
+  formacao : TEXT
+  cursos_complementares : TEXT
+  informacoes_adicionais : TEXT
+  idiomas : TEXT
+  competencias : TEXT
+  nivel_experiencia : ENUM(...)
+  disponibilidade : VARCHAR(100)
+  objetivo : TEXT
+  links : TEXT
+  cnh : VARCHAR(5)
+  pretensao_salarial : VARCHAR(60)
+  foto : VARCHAR(255)
+  publico : TINYINT(1) NN
+  aceite_lgpd : TINYINT(1) NN
+  aceite_em : DATETIME
+  created_at : DATETIME NN
+  updated_at : DATETIME NN
+}
+entity categorias {
+  PK <b>id</b> : INT(11)
+  --
+  nome : VARCHAR(100) NN UQ
+  tipo : ENUM(...) NN UQ
+  ativo : TINYINT(1) NN
+}
+entity vagas {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>perfil_empresa_id</i> : INT(11) NN
+  FK <i>categoria_id</i> : INT(11)
+  titulo : VARCHAR(255) NN
+  anunciante : VARCHAR(150)
+  descricao : TEXT
+  requisitos : TEXT
+  beneficios : TEXT
+  contato : VARCHAR(255)
+  tipo_vaga : ENUM(...) NN
+  nivel_experiencia : ENUM(...) NN
+  remoto : ENUM(...) NN
+  cidade : VARCHAR(100)
+  uf : VARCHAR(2)
+  salario_minimo : DECIMAL(10,2)
+  salario_maximo : DECIMAL(10,2)
+  imagem : VARCHAR(255)
+  status : ENUM(...) NN
+  destaque : TINYINT(1) NN
+  data_publicacao : DATE
+  data_expiracao : DATE
+  visualizacoes : INT(11) NN
+  created_at : DATETIME NN
+}
+entity cursos {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>categoria_id</i> : INT(11)
+  titulo : VARCHAR(255) NN
+  descricao : TEXT
+  tipo : ENUM(...) NN
+  modalidade : ENUM(...) NN
+  nivel : ENUM(...) NN
+  duracao : VARCHAR(50)
+  gratuito : TINYINT(1) NN
+  preco : DECIMAL(10,2)
+  url : VARCHAR(500)
+  imagem : VARCHAR(255)
+  instituicao : VARCHAR(255)
+  ativo : TINYINT(1) NN
+  created_at : DATETIME NN
+}
+entity curriculos {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>perfil_id</i> : INT(11) NN
+  titulo : VARCHAR(255)
+  arquivo_pdf : VARCHAR(255) NN
+  arquivo_tipo : VARCHAR(20) NN
+  curriculo_texto : LONGTEXT
+  template : VARCHAR(50) NN
+  downloads : INT(11) NN
+  created_at : DATETIME NN
+}
+entity matches {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>perfil_candidato_id</i> : INT(11) NN UQ
+  FK <i>vaga_id</i> : INT(11) NN UQ
+  pontuacao : DECIMAL(5,2) NN
+  nivel : ENUM(...) NN
+  detalhes : TEXT
+  visualizado : TINYINT(1) NN
+  created_at : DATETIME NN
+}
+entity assinaturas {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>usuario_id</i> : INT(11) NN
+  plano : ENUM(...) NN
+  valor : DECIMAL(10,2) NN
+  data_inicio : DATE NN
+  data_fim : DATE NN
+  status : ENUM(...) NN
+  created_at : DATETIME NN
+}
+entity candidaturas {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>perfil_candidato_id</i> : INT(11) NN UQ
+  FK <i>vaga_id</i> : INT(11) NN UQ
+  FK <i>curriculo_id</i> : INT(11)
+  carta_apresentacao : TEXT
+  status : ENUM(...) NN
+  observacao_empresa : TEXT
+  data_candidatura : DATETIME NN
+  data_atualizacao : DATETIME NN
+}
+entity tentativas_login {
+  PK <b>id</b> : INT(11)
+  --
+  ip : VARCHAR(45) NN
+  email : VARCHAR(255) NN
+  created_at : DATETIME NN
+}
+entity redefinicoes_senha {
+  PK <b>id</b> : INT(11)
+  --
+  FK <i>usuario_id</i> : INT(11) NN
+  token_hash : CHAR(64) NN UQ
+  expira_em : DATETIME NN
+  usado_em : DATETIME
+  ip : VARCHAR(45)
+  created_at : DATETIME NN
+}
+entity aprendizado_exemplos {
+  PK <b>id</b> : INT(11)
+  --
+  modelo : VARCHAR(40) NN UQ
+  classe : VARCHAR(100) NN
+  texto : VARCHAR(500) NN
+  chave : CHAR(40) NN UQ
+  vezes : INT(11) NN
+  FK <i>usuario_id</i> : INT(11)
+  created_at : DATETIME NN
+  updated_at : DATETIME NN
+}
+entity aprendizado_palavras {
+  PK <b>modelo</b> : VARCHAR(40)
+  PK <b>classe</b> : VARCHAR(100)
+  PK <b>palavra</b> : VARCHAR(100)
+  --
+  contagem : INT(11) NN
+}
+entity aprendizado_revisoes {
+  PK <b>id</b> : INT(11)
+  --
+  origem : VARCHAR(20) NN
+  campos : INT(11) NN
+  campos_certos : INT(11) NN
+  linhas : INT(11) NN
+  linhas_certas : INT(11) NN
+  licoes : INT(11) NN
+  FK <i>usuario_id</i> : INT(11)
+  created_at : DATETIME NN
+}
+entity aprendizado_provas {
+  PK <b>modelo</b> : VARCHAR(40)
+  --
+  provas : INT(11) NN
+  acertos : INT(11) NN
+  updated_at : DATETIME NN
+}
+entity aprendizado_calibracao {
+  PK <b>modelo</b> : VARCHAR(40)
+  --
+  temperatura : DECIMAL(8,3) NN
+  licoes : INT(11) NN
+  amostras : INT(11) NN
+  nll_antes : DECIMAL(10,4) NN
+  nll_depois : DECIMAL(10,4) NN
+  updated_at : DATETIME NN
+}
+usuarios ||--o| perfis
+usuarios ||--o{ assinaturas
+usuarios ||--o{ redefinicoes_senha
+usuarios |o--o{ aprendizado_exemplos
+usuarios |o--o{ aprendizado_revisoes
+perfis ||--o{ curriculos
+perfis ||--o{ vagas
+perfis ||--o{ candidaturas
+perfis ||--o{ matches
+vagas ||--o{ candidaturas
+vagas ||--o{ matches
+curriculos |o--o{ candidaturas
+categorias |o--o{ vagas
+categorias |o--o{ cursos
+tentativas_login -[hidden]- aprendizado_palavras
+aprendizado_provas -[hidden]- aprendizado_calibracao
+@enduml

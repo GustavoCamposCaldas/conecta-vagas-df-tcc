@@ -1,0 +1,23 @@
+@startuml
+!include estilo.iuml
+mainframe sd Atualizar status da candidatura
+autonumber "0:"
+hide footbox
+
+actor Empresa as E
+boundary ":TelaCandidaturas" as T
+control ":EmpresaController" as C
+entity ":CandidaturaDAO" as D
+E -> T ++ : acessar candidaturas
+T -> C ++ : candidaturas(vaga, status)
+C -> D ++ : listarPorEmpresa(perfilId, vaga, status)
+D --> C -- : lista (VIP e maior match primeiro)
+C --> T -- : resultado
+T --> E -- : exibir candidaturas
+E -> T ++ : mudar status e escrever retorno
+T -> C ++ : candidaturas(acao = status, id, obs)
+C -> D ++ : atualizarStatusPorEmpresa(id, perfilId, status, obs)
+D --> C -- : true
+C --> T -- : "Candidatura atualizada."
+T --> E -- : exibir mensagem
+@enduml

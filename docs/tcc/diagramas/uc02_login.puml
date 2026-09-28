@@ -1,0 +1,20 @@
+@startuml
+!include estilo.iuml
+mainframe uc Realizar login
+left to right direction
+actor Candidato
+actor Empresa
+actor Administrador
+actor "Usuário" as U
+Candidato -|> U
+Empresa -|> U
+Administrador -|> U
+rectangle "Conecta Vagas DF" {
+  usecase "Realizar login" as L
+  usecase "Pausar o login após\ntentativas repetidas" as B
+  usecase "Encerrar sessão\n(sair)" as S
+}
+U -- L
+U -- S
+L <.. B : <<extend>>
+@enduml
