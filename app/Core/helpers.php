@@ -33,6 +33,82 @@ function redirect(string $path): never { header('Location: '.url($path)); exit; 
 function post_str(string $key, string $default=''): string { $v=$_POST[$key]??$default; return is_scalar($v) ? trim((string)$v) : $default; }
 function post_int(string $key, int $default=0): int { $v=$_POST[$key]??$default; return is_numeric($v) ? (int)$v : $default; }
 function get_str(string $key, string $default=''): string { $v=$_GET[$key]??$default; return is_scalar($v) ? trim((string)$v) : $default; }
+/** Termo de busca para LIKE: "%termo%" com % e _ digitados tratados como texto (não como curinga). */
+function like(string $termo): string { return '%'.addcslashes($termo, '%_\\').'%'; }
+/** "?tipo=ebook&q=excel": filtros da lista que o formulário da ação reenviou (campos f_tipo, f_q), para voltar à mesma lista. */
+function volta_filtros(array $chaves): string {
+    $q = [];
+    foreach ($chaves as $k) { $v = mb_substr(post_str('f_'.$k), 0, 100); if ($v !== '') $q[$k] = $v; }
+    return $q ? '?'.http_build_query($q) : '';
+}
+
+/**
+ * Ordenação das tabelas do painel (?ordem=campo&dir=asc|desc): só aceita os campos permitidos.
+ * @return array{0:string,1:string} [campo, direção]
+ */
+function lista_ordem(array $permitidos, string $padrao, string $dirPadrao = 'asc'): array {
+    $campo = enum_val(get_str('ordem'), $permitidos, $padrao);
+    $dir = enum_val(get_str('dir'), ['asc', 'desc'], $campo === $padrao ? $dirPadrao : 'asc');
+    return [$campo, $dir];
+}
+
+/** Ordena as linhas pelo campo (números como números, textos sem diferenciar maiúsculas/acentos); vazios sempre no fim. */
+function ordenar_linhas(array $linhas, string $campo, string $dir = 'asc'): array {
+    $chave = static function (mixed $v): mixed {
+        if ($v === null || $v === '') return null;
+        if (is_numeric($v)) return (float)$v;
+        return Competencias::normalizar((string)$v);
+    };
+    usort($linhas, function ($a, $b) use ($campo, $dir, $chave) {
+        [$x, $y] = [$chave($a[$campo] ?? null), $chave($b[$campo] ?? null)];
+        if ($x === null || $y === null) return ($x === null) <=> ($y === null) ?: ((int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0));
+        $c = is_float($x) && is_float($y) ? $x <=> $y : strnatcmp((string)$x, (string)$y);
+        if ($c === 0) $c = (int)($a['id'] ?? 0) <=> (int)($b['id'] ?? 0);   // desempate estável pelo id
+        return $dir === 'desc' ? -$c : $c;
+    });
+    return $linhas;
+}
+
+/**
+ * Página atual de uma lista (?pagina=N).
+ * @return array{0:array,1:int,2:int} [linhas da página, página, total de páginas]
+ */
+function paginar(array $linhas, int $porPagina = 25): array {
+    $paginas = max(1, (int)ceil(count($linhas) / $porPagina));
+    $pagina = min(max(1, (int)get_str('pagina')), $paginas);
+    return [array_slice(array_values($linhas), ($pagina - 1) * $porPagina, $porPagina), $pagina, $paginas];
+}
+
+/**
+ * Carregador das máquinas de extração: AMARELO enquanto carrega/lê, AZUL quando está pronto.
+ * Sem $texto sai escondido (o JavaScript mostra e atualiza); com $pronto sai azul e cheio (resultado já na tela).
+ */
+function carregador_html(string $texto = '', bool $pronto = false): string {
+    return '<div class="carregador'.($pronto ? ' pronto' : '').'" data-carregador role="status" aria-live="polite"'.($texto === '' ? ' hidden' : '').'>'
+        .'<div class="carregador-trilho"><span class="carregador-barra"'.($pronto ? ' style="width:100%"' : '').'></span></div>'
+        .'<span class="carregador-texto">'.e($texto).'</span></div>';
+}
+
+/**
+ * Endereço da própria lista com os filtros atuais trocando só o que vier em $troca
+ * (ordem, dir, pagina, tipo...). Não leva edit/ver: abrir um formulário não muda a lista.
+ */
+function painel_qs(array $troca = []): string {
+    $q = array_filter(array_map(fn($v) => is_scalar($v) ? (string)$v : '', $_GET), fn($v) => $v !== '');
+    unset($q['edit'], $q['ver'], $q['novo']);
+    $q = array_filter($troca + $q, fn($v) => $v !== '' && $v !== null);
+    if ((int)($q['pagina'] ?? 1) <= 1) unset($q['pagina']);
+    return '?'.http_build_query($q);
+}
+
+/**
+ * "Editar"/"Ver" de um registro que não existe mais (ex.: excluído em outra aba): avisa e volta para a lista,
+ * em vez de abrir o formulário vazio sem explicação.
+ */
+function registro_encontrado(?array $registro, string $param, string $lista, string $aviso = 'Registro não encontrado (pode ter sido excluído).'): ?array {
+    if (get_str($param) !== '' && !$registro) { flash('erro', $aviso); redirect($lista.painel_qs()); }
+    return $registro;
+}
 
 /** Valor digitado anteriormente (para repreencher o formulário depois de um erro), já escapado. */
 function old(string $key,string $default=''): string { $v=$_POST[$key]??$default; return e(is_scalar($v) ? (string)$v : $default); }
@@ -67,6 +143,16 @@ function trim_u(string $s, string $chars = " \t\n\r\0\x0B", string $lado = 'ambo
 
 /** E-mail sempre em minúsculas e sem espaços (é assim que fica gravado no banco). */
 function normalizar_email(string $email): string { return strtolower(trim($email)); }
+
+/** E-mail para log sem expor a pessoa (LGPD): "candidato@site.com" → "ca*******@site.com". */
+function mascarar_email(string $email): string {
+    $email = normalizar_email($email);
+    $arroba = strrpos($email, '@');
+    if ($arroba === false) return str_repeat('*', min(8, mb_strlen($email)));
+    $usuario = substr($email, 0, $arroba);
+    $mostra = mb_strlen($usuario) > 3 ? 2 : 1;
+    return mb_substr($usuario, 0, $mostra).str_repeat('*', max(1, mb_strlen($usuario) - $mostra)).substr($email, $arroba);
+}
 
 /** URL externa segura para links (só http/https; bloqueia javascript:, data: etc.). */
 function url_http_valida(string $u): bool {

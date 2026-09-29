@@ -1,8 +1,10 @@
 <?php
 /**
- * Rodapé do layout: links de navegação, conta, links úteis e contato.
+ * Rodapé do layout: apoio ao projeto (QR Code Pix), links de navegação, conta, links úteis e contato.
  * Incluído por View::render() depois de cada tela. Usa $portfolioLiberado (calculado no cabeçalho).
  */
+require_once __DIR__.'/../partials/doacao.php';
+$pixDoacao = Pix::doacao();
 ?>
 </main>
 
@@ -18,6 +20,11 @@
       <?php else: ?>
         <a class="cv-btn cv-btn-verde" href="<?=url('admin/pages/vagas.php')?>">Publicar vaga</a>
       <?php endif; ?>
+      <?php // Doação: logo abaixo, simples — o QR Code e uma frase (a mesma mensagem passa no painel relâmpago). ?>
+      <div class="cv-doacao" id="apoie">
+        <?=cv_doacao_qr($pixDoacao, 96)?>
+        <p><b><?=icone('coracao', 13)?> <?=e(DOACAO_TITULO)?></b><br><?=e(DOACAO_TEXTO)?></p>
+      </div>
     </div>
     <div>
       <h2>Navegação</h2>
@@ -27,6 +34,7 @@
         <li><a href="<?=url('cursos.php')?>">Cursos gratuitos</a></li>
         <li><a href="<?=url('cursos.php?tipo=ebook')?>">E-books</a></li>
         <li><a href="<?=url('planos.php')?>">Planos e assinaturas</a></li>
+        <li><a href="#apoie">Apoie o projeto (Pix)</a></li>
       </ul>
     </div>
     <div>
@@ -83,6 +91,7 @@
   <a class="cv-topo-btn" href="#conteudo" aria-label="Voltar ao topo"><?=icone('topo', 20)?></a>
 </footer>
 
-<script src="<?=url('assets/js/app.js')?>?v=3"></script>
+<?php if ($pixDoacao !== ''): ?><script src="<?=url('assets/js/vendor/qrcode.js')?>?v=1.4.4"></script><?php endif; ?>
+<script src="<?=url('assets/js/app.js')?>?v=8"></script>
 </body>
 </html>

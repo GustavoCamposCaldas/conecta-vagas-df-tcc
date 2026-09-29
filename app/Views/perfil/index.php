@@ -56,7 +56,7 @@
         <div class="section-head" style="margin-top:0"><h3 style="margin:0">📄 Máquina de extração do currículo</h3></div>
         <div class="cv-machine">
             <p>Envie PDF, DOCX ou DOC (até 10 MB). O sistema lê o arquivo (inclusive modelos em duas colunas do Canva/Word), separa nome, contato, LinkedIn/GitHub, resumo, experiências, formação, cursos, habilidades, idiomas, CNH, disponibilidade, pretensão salarial, PCD e a foto, e <b>preenche o seu cadastro</b> abaixo, mostrando um <b>relatório</b> do que foi encontrado. Com o cadastro validado, a aba <b>Portfólio</b> é liberada — lá ficam o portfólio montado e a máquina de match.</p>
-            <form method="post" action="<?=url('view/perfil/curriculo_upload.php')?>" enctype="multipart/form-data">
+            <form method="post" action="<?=url('view/perfil/curriculo_upload.php')?>" enctype="multipart/form-data" data-carregando="Lendo o currículo e preenchendo o perfil…">
                 <input type="hidden" name="csrf" value="<?=e(csrf_token())?>">
                 <div class="form-grid">
                     <div><label>Arquivo</label><input type="file" name="curriculo" accept=".pdf,.docx,.doc" required></div>
@@ -163,6 +163,21 @@
                 <?php endif; ?>
             </div>
         <?php endforeach; endif; ?>
+    </div>
+
+    <div class="panel" id="excluir-conta" style="margin-top:18px">
+        <h3>🔒 Seus dados (LGPD)</h3>
+        <p class="meta">Você pode apagar a sua conta quando quiser. Saem juntos o perfil, os currículos e arquivos, a foto, as candidaturas e o match. Não dá para desfazer.</p>
+        <details>
+            <summary style="cursor:pointer; font-weight:700; color:#991b1b;">Excluir minha conta</summary>
+            <form method="post" action="<?=url('view/perfil/conta_excluir.php')?>" style="margin-top:10px">
+                <input type="hidden" name="csrf" value="<?=e(csrf_token())?>">
+                <label for="ex-senha">Digite sua senha para confirmar</label>
+                <input id="ex-senha" type="password" name="senha" required autocomplete="current-password">
+                <div class="check" style="margin-top:10px"><input type="checkbox" name="confirmo" value="1" id="ex-confirmo" required><label for="ex-confirmo" style="font-weight:400">Entendo que a minha conta e os meus dados serão apagados para sempre.</label></div>
+                <div class="form-actions" style="margin-top:12px"><button class="btn btn-sm btn-danger">Excluir minha conta</button></div>
+            </form>
+        </details>
     </div>
 </aside>
 </div>

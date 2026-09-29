@@ -247,6 +247,19 @@ function painel_match(mixed $pontuacao, ?string $nivel): string {
 }
 
 /**
+ * Botão de ação de uma linha da tabela (ativar, pausar, excluir...): um mini formulário POST com o
+ * token CSRF — ações que mudam dados nunca são links GET. $filtros volta a lista filtrada (campos f_*).
+ * $classe: '' (principal), 'btn-outline' ou 'btn-danger'; $confirmar abre a confirmação do app.js.
+ */
+function painel_acao(string $acao, int $id, string $texto, string $classe = 'btn-outline', string $confirmar = '', array $filtros = [], array $extras = []): string {
+    $h = '<form method="post"><input type="hidden" name="csrf" value="'.e(csrf_token()).'">'
+       .'<input type="hidden" name="acao" value="'.e($acao).'"><input type="hidden" name="id" value="'.$id.'">';
+    foreach ($filtros as $k => $v) if ((string)$v !== '') $h .= '<input type="hidden" name="f_'.e($k).'" value="'.e($v).'">';
+    foreach ($extras as $k => $v) $h .= '<input type="hidden" name="'.e($k).'" value="'.e($v).'">';
+    return $h.'<button class="btn btn-sm '.e($classe).'"'.($confirmar !== '' ? ' data-confirm="'.e($confirmar).'"' : '').'>'.e($texto).'</button></form>';
+}
+
+/**
  * Cabeçalho das telas do painel: área (administrador/empresa), título, descrição e ações à direita.
  * $acoes é HTML montado pela própria view (botões e selos).
  */
@@ -254,4 +267,93 @@ function painel_cabecalho(string $titulo, string $descricao = '', string $acoes 
     return '<header class="pn-cab"><div class="pn-cab-txt"><p class="pn-area">'.(isAdmin() ? 'Painel administrativo' : 'Painel da empresa').'</p>'
          .'<h1>'.e($titulo).'</h1>'.($descricao !== '' ? '<p class="pn-desc">'.e($descricao).'</p>' : '').'</div>'
          .($acoes !== '' ? '<div class="pn-cab-acoes">'.$acoes.'</div>' : '').'</header>';
+}
+
+/** Cabeçalho de coluna ordenável: clicar ordena por ela; clicar de novo inverte. aria-sort para leitor de tela. */
+function painel_th(string $campo, string $rotulo, string $ordem, string $dir, string $classe = ''): string {
+    $ativo = $ordem === $campo;
+    $novoDir = $ativo && $dir === 'asc' ? 'desc' : 'asc';
+    $seta = $ativo ? ($dir === 'asc' ? '▲' : '▼') : '↕';
+    return '<th'.($classe !== '' ? ' class="'.e($classe).'"' : '').($ativo ? ' aria-sort="'.($dir === 'asc' ? 'ascending' : 'descending').'"' : '').'>'
+         .'<a class="pn-ordem'.($ativo ? ' ativo' : '').'" href="'.e(painel_qs(['ordem' => $campo, 'dir' => $novoDir, 'pagina' => ''])).'">'
+         .e($rotulo).' <span class="pn-ordem-seta" aria-hidden="true">'.$seta.'</span>'
+         .'<span class="sr-only">(ordenar '.($novoDir === 'asc' ? 'crescente' : 'decrescente').')</span></a></th>';
+}
+
+/** Paginação das tabelas do painel (mantém filtros e ordenação). */
+function painel_paginacao(int $pagina, int $paginas): string {
+    if ($paginas <= 1) return '';
+    $h = '<nav class="an-paginacao pn-paginacao" aria-label="Páginas da tabela">';
+    $h .= $pagina > 1 ? '<a class="an-pag-seta" href="'.e(painel_qs(['pagina' => $pagina - 1])).'" rel="prev">‹ Anterior</a>' : '<span class="an-pag-seta" aria-disabled="true">‹ Anterior</span>';
+    $antes = 0;
+    for ($n = 1; $n <= $paginas; $n++) {
+        if ($n !== 1 && $n !== $paginas && abs($n - $pagina) > 1) { if ($antes !== -1) $h .= '<span class="an-pag-reticencias" aria-hidden="true">…</span>'; $antes = -1; continue; }
+        $antes = $n;
+        $h .= $n === $pagina ? '<span class="an-pag-num ativo" aria-current="page"><span class="sr-only">Página </span>'.$n.'</span>'
+                             : '<a class="an-pag-num" href="'.e(painel_qs(['pagina' => $n])).'"><span class="sr-only">Página </span>'.$n.'</a>';
+    }
+    $h .= $pagina < $paginas ? '<a class="an-pag-seta" href="'.e(painel_qs(['pagina' => $pagina + 1])).'" rel="next">Próxima ›</a>' : '<span class="an-pag-seta" aria-disabled="true">Próxima ›</span>';
+    return $h.'</nav>';
+}
+
+/** Abas internas de uma tela (ex.: Cursos · E-books · Vídeos): [valor => [rótulo, contagem]]. */
+function painel_subabas(string $param, string $atual, array $abas, string $rotulo): string {
+    $h = '<nav class="pn-subabas" aria-label="'.e($rotulo).'">';
+    foreach ($abas as $valor => [$texto, $n]) {
+        $ativo = (string)$valor === $atual;
+        $h .= '<a href="'.e(painel_qs([$param => (string)$valor, 'pagina' => ''])).'"'.($ativo ? ' class="ativo" aria-current="page"' : '').'>'.e($texto).' <span class="pn-subabas-n">'.gf_num((int)$n).'</span></a>';
+    }
+    return $h.'</nav>';
+}
+
+/**
+ * Chave liga/desliga (estilo "switch" do Bootstrap) para a situação de um registro: Aberta/Pausada,
+ * Publicado/Oculto, Ativo/Bloqueado. É um botão de formulário POST com o token CSRF (role="switch"): clicar envia
+ * a ação oposta ao estado atual e a lista volta com os mesmos filtros. $confirmarDesligar abre a confirmação do app.js.
+ */
+function painel_chave(bool $ligado, string $acaoLigar, string $acaoDesligar, int $id, string $rotuloLigado, string $rotuloDesligado,
+                      string $confirmarDesligar = '', string $nome = ''): string {
+    $acao = $ligado ? $acaoDesligar : $acaoLigar;
+    $dica = 'Clique para mudar para "'.($ligado ? $rotuloDesligado : $rotuloLigado).'"';
+    return '<form method="post" class="pn-chave-form"><input type="hidden" name="csrf" value="'.e(csrf_token()).'">'
+         .'<input type="hidden" name="acao" value="'.e($acao).'"><input type="hidden" name="id" value="'.$id.'">'
+         .'<button type="submit" class="pn-chave'.($ligado ? ' ligada' : '').'" role="switch" aria-checked="'.($ligado ? 'true' : 'false').'" title="'.e($dica).'"'
+         .($ligado && $confirmarDesligar !== '' ? ' data-confirm="'.e($confirmarDesligar).'"' : '').'>'
+         .'<span class="pn-chave-trilho" aria-hidden="true"><span class="pn-chave-bolinha"></span></span>'
+         .'<span class="pn-chave-txt">'.e($ligado ? $rotuloLigado : $rotuloDesligado).'</span>'
+         .($nome !== '' ? '<span class="sr-only"> — '.e($nome).'</span>' : '').'</button></form>';
+}
+
+/**
+ * Barra de botões do CRUD numa linha só (estilo "btn-group" do Bootstrap): ícone + rótulo; em telas menores fica só
+ * o ícone (o rótulo aparece ao passar o mouse e é lido pelo leitor de tela). Cada item:
+ *  - link:  ['href' => url, 'texto' => 'Ver', 'icone' => 'olho', 'estilo' => 'primario', 'nova_aba' => true]
+ *  - ação:  ['acao' => 'excluir', 'id' => 5, 'texto' => 'Excluir', 'icone' => 'lixeira', 'estilo' => 'perigo', 'confirmar' => '...']
+ * Estilos: primario, neutro, sucesso, alerta, perigo. 'so_icone' => true mostra só o ícone (o nome fica na dica e no
+ * leitor de tela). $nome entra no texto do leitor de tela ("Editar Atendente").
+ */
+function painel_botoes(array $itens, string $nome = ''): string {
+    $h = '<div class="pn-bts" role="group" aria-label="Ações'.($nome !== '' ? ' de '.e($nome) : '').'">';
+    foreach ($itens as $b) {
+        if (!$b) continue;
+        $classe = 'pn-bt pn-bt-'.e($b['estilo'] ?? 'neutro').(!empty($b['so_icone']) ? ' pn-bt-icone' : '');
+        $miolo = icone($b['icone'] ?? 'seta', 15).'<span class="'.(!empty($b['so_icone']) ? 'sr-only' : 'pn-bt-txt').'">'.e($b['texto']).'</span>'
+               .($nome !== '' ? '<span class="sr-only"> '.e($nome).'</span>' : '').(!empty($b['nova_aba']) ? '<span class="sr-only"> (abre em nova aba)</span>' : '');
+        if (isset($b['href'])) {
+            $h .= '<a class="'.$classe.'" href="'.e($b['href']).'" title="'.e($b['texto']).'"'.(!empty($b['nova_aba']) ? ' target="_blank" rel="noopener"' : '').'>'.$miolo.'</a>';
+        } else {
+            $h .= '<form method="post" class="pn-bt-form"><input type="hidden" name="csrf" value="'.e(csrf_token()).'">'
+                .'<input type="hidden" name="acao" value="'.e($b['acao']).'"><input type="hidden" name="id" value="'.(int)$b['id'].'">'
+                .'<button type="submit" class="'.$classe.'" title="'.e($b['texto']).'"'.(($b['confirmar'] ?? '') !== '' ? ' data-confirm="'.e($b['confirmar']).'"' : '').'>'.$miolo.'</button></form>';
+        }
+    }
+    return $h.'</div>';
+}
+
+/** Miniatura da imagem do registro (vaga, curso, e-book) na lista do painel; sem imagem, o ícone do tipo. */
+function painel_miniatura(?string $img, string $classe = '', string $icone = 'vagas'): string {
+    $img = trim((string)$img);
+    if ($img === '') return '<span class="pn-miniatura pn-miniatura-vazia '.e($classe).'" aria-hidden="true">'.icone($icone, 20).'</span>';
+    $src = preg_match('#^https?://#i', $img) ? $img : url($img);
+    return '<img class="pn-miniatura '.e($classe).'" src="'.e($src).'" alt="" loading="lazy">';
 }

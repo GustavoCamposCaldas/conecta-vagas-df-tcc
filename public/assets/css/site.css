@@ -55,7 +55,7 @@ body.cv .progress{border-radius:3px}
 /* ---------- Página inicial: boas-vindas ---------- */
 .cv-hero{color:#fff;padding:46px 0 42px;background:
   linear-gradient(90deg,#0a2f6ef7 0%,#0b3a8ce6 36%,#0b3a8c80 60%,#0b3a8c10 85%),
-  url('../img/header-bg.png') center 62%/cover #0b3a8c}
+  url('../img/header-bg.jpg') center 62%/cover #0b3a8c}
 .cv-hero h1{margin:0 0 14px;font-size:40px;font-weight:800;line-height:1.1;text-shadow:0 2px 8px #0003}
 .cv-hero h1::after{content:"";display:block;width:88px;height:4px;margin-top:12px;background:var(--cv-dourado);border-radius:2px}
 .cv-hero p{max-width:640px;margin:0 0 8px;font-size:17px;color:#e8f0ff}
@@ -88,6 +88,7 @@ body.cv .progress{border-radius:3px}
 .cv-form input[type=radio],.cv-form input[type=checkbox]{width:auto;margin:2px 0 0}
 .cv-senha{position:relative;display:block}
 .cv-senha input{padding-right:38px!important}
+.cv-senha input::-ms-reveal,.cv-senha input::-ms-clear{display:none}   /* Edge: só o olho do site, sem o olho duplicado do navegador */
 .cv-olho{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;padding:4px;color:var(--cv-cinza);cursor:pointer}
 .cv-link-peq{display:block;text-align:center;font-size:13px;font-weight:700;color:var(--cv-azul)}
 .cv-atalhos,.cv-lista-match,.cv-planos,.cv-links{list-style:none;margin:0;padding:0}
@@ -156,7 +157,7 @@ body.cv .progress{border-radius:3px}
 /* ---------- Faixa de título das páginas internas ---------- */
 .cv-faixa{color:#fff;padding:22px 0 20px;background:
   linear-gradient(90deg,#0a2f6ef7 0%,#0b3a8ce6 45%,#0b3a8c8c 72%,#0b3a8c40),
-  url('../img/header-bg.png') center 62%/cover #0b3a8c}
+  url('../img/header-bg.jpg') center 62%/cover #0b3a8c}
 .cv-faixa h1{margin:0;font-size:28px;line-height:1.2}
 .cv-faixa p{max-width:760px;margin:5px 0 0;color:#dbe7ff}
 .cv-trilha{margin-bottom:6px;font-size:13px;color:#cfe0ff}
@@ -166,11 +167,19 @@ body.cv .progress{border-radius:3px}
 /* ---------- Listagens: filtros, abas e barra de resultado ---------- */
 .cv-filtros{display:grid;grid-template-columns:2fr 1.2fr 1.3fr 1fr 1fr auto;gap:10px;margin:18px 0 12px;padding:12px;background:#fff;border:1px solid var(--cv-linha);border-radius:var(--cv-raio)}
 .cv-filtros input,.cv-filtros select{margin:0;padding:9px 10px;font-size:14px}
+.cv-filtros-cursos{grid-template-columns:2fr 1.3fr 1fr 1fr auto}   /* busca, área, preço, ordem, botão (os @media abaixo empilham) */
 .cv-abas{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
 .cv-abas a{padding:6px 12px;border:1px solid var(--cv-linha);border-radius:4px;background:#fff;color:var(--cv-texto);font-size:13.5px;font-weight:600;text-decoration:none}
 .cv-abas a:hover{border-color:var(--cv-azul);color:var(--cv-azul)}
 .cv-abas a.ativo{background:var(--cv-azul);border-color:var(--cv-azul);color:#fff}
 .cv-abas small{opacity:.75;font-weight:500}
+/* Atalhos de área (cursos/e-books/vídeos): pílulas; no celular rolam de lado numa linha só */
+.cv-areas{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 14px}
+.cv-areas a{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--cv-linha);border-radius:999px;background:var(--cv-fundo,#f4f6f9);color:var(--cv-texto);font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap}
+.cv-areas a:hover{border-color:var(--cv-azul);color:var(--cv-azul)}
+.cv-areas a.ativo{background:var(--cv-azul-claro,#e8f0ff);border-color:var(--cv-azul);color:var(--cv-azul)}
+.cv-areas small{display:inline-grid;place-items:center;min-width:20px;height:18px;padding:0 5px;border-radius:9px;background:#fff;font-size:11.5px;font-weight:700}
+@media (max-width:640px){.cv-areas{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}}
 .cv-barra{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin:0 0 14px;font-size:14px;color:var(--cv-cinza)}
 .cv-barra b{color:var(--cv-tinta)}
 .cv-recomendados{margin:0 0 18px;padding:14px 16px;border:1px solid #bcd3f5;border-left:4px solid var(--cv-azul);border-radius:var(--cv-raio);background:#f5f9ff}
@@ -219,6 +228,20 @@ body.cv .progress{border-radius:3px}
 .cv-rodape a:hover{color:#fff;text-decoration:underline}
 .cv-rodape .cv-btn{color:#fff;text-decoration:none}
 .cv-rodape-nota{font-size:12.5px!important;color:#8e9bb0}
+/* Doação no rodapé: um cantinho discreto, alinhado à direita, com QR pequeno */
+.cv-doacao{display:flex;align-items:center;gap:12px;margin-top:18px}
+.cv-rodape .cv-doacao p{margin:0;font-size:12.5px;line-height:1.45;color:#aebbd0}
+.cv-rodape .cv-doacao p b{display:inline-flex;align-items:center;gap:5px;color:#dbe5f2}
+.cv-doacao p b .ic{color:#ff9db5}
+.cv-doacao-codigo{display:grid;place-items:center;flex:none;padding:3px;background:#fff;border-radius:6px}
+.cv-doacao-codigo svg{display:block;width:100%;height:100%}
+.cv-doacao-copiar-link{display:inline-flex;align-items:center;gap:4px;flex:none;padding:5px 8px;border:1px solid #ffffff33;border-radius:6px;background:none;color:#dbe5f2;font:inherit;font-size:12px;cursor:pointer}
+.cv-doacao-copiar-link:hover,.cv-doacao-copiar-link.copiado{background:#ffffff14;color:#fff}
+.cv-doacao-pendente{display:grid!important;place-content:center;justify-items:center;gap:2px;color:#d6336c;text-align:center;background:#fff7fa!important}
+.cv-doacao-pendente span{font-size:9.5px;font-weight:700;line-height:1.2;color:#7a2745}
+.cv-doacao-config{margin:0 auto;padding:8px 16px;background:#3a2a00;color:#ffe08a;font-size:12.5px}
+.cv-doacao-config code{color:#fff}
+img.cv-doacao-codigo{display:block;object-fit:contain}
 .cv-rodape-base{border-top:1px solid #ffffff1a;background:#0b1422;font-size:12.5px;color:#8e9bb0}
 .cv-rodape-base .cv-wrap{display:flex;justify-content:space-between;gap:10px;padding-top:12px;padding-bottom:12px}
 .cv-topo-btn{position:absolute;right:24px;top:-22px;width:44px;height:44px;border-radius:50%;background:var(--cv-azul);color:#fff!important;display:grid;place-items:center;box-shadow:0 4px 12px #0005}
@@ -308,6 +331,9 @@ body.cv .cv-faixa h1,body.cv .cv-hero h1,body.cv .profile-head h1,body.cv .pf-ba
 .cv-card-img img{display:block;width:100%;height:100%;object-fit:contain}
 .cv-card-curso .cv-card-img{aspect-ratio:16/9}
 .cv-card-curso .cv-card-img img{object-fit:cover}
+/* E-book: capa em pé, inteira (sem cortar) */
+.cv-card-ebook .cv-card-img{aspect-ratio:3/4}
+.cv-card-ebook .cv-card-img img{object-fit:contain}
 .cv-img-vazia{display:grid;place-items:center;width:100%;height:100%;color:#fff;background:linear-gradient(135deg,var(--cv-azul-esc),var(--cv-azul))}
 .cv-card-corpo{padding:10px 12px 4px}
 .cv-chapeu{font-size:10.5px;margin-bottom:4px}
@@ -321,6 +347,7 @@ body.cv .cv-faixa h1,body.cv .cv-hero h1,body.cv .profile-head h1,body.cv .pf-ba
 /* Detalhe da vaga/curso: imagem limpa, sem fundo desfocado */
 .pt-midia{background:#f3f5f8}
 .pt-midia::before{display:none}
+.pt-midia.pt-midia-vazia{background:linear-gradient(135deg,var(--cv-azul-esc),var(--cv-azul))}   /* sem capa: mesmo azul do cartão */
 
 /* Faixa de assinaturas (meio da página inicial) */
 .cv-assinaturas{background:var(--cv-fundo);border-top:1px solid var(--cv-linha);border-bottom:1px solid var(--cv-linha)}
@@ -447,21 +474,50 @@ body.cv .cv-faixa h1,body.cv .cv-hero h1,body.cv .profile-head h1,body.cv .pf-ba
   .cv-hero-busca .cv-btn{width:100%}
 }
 
-.cv-relampago{position:fixed;left:20px;bottom:20px;z-index:45;width:min(360px,calc(100vw - 32px));padding:16px 40px 20px 16px;background:#fff;border:1px solid var(--cv-linha);border-left:4px solid var(--cv-dourado);border-radius:var(--cv-raio);box-shadow:0 18px 40px #0a2a6040;opacity:0;transform:translateY(16px);transition:opacity .35s ease,transform .35s ease;overflow:hidden}
+/* Painel relâmpago: um balão de ideia pequeno e delicado no canto da tela (as bolinhas saem do canto, como num pensamento) */
+.cv-relampago{position:fixed;left:26px;bottom:34px;z-index:45;width:min(280px,calc(100vw - 48px));padding:14px 30px 16px 16px;background:#fff;border:1px solid #dbe6f5;border-radius:26px;box-shadow:0 10px 28px #0a2a6026;opacity:0;transform:translateY(10px);transition:opacity .5s ease,transform .5s ease}
+.cv-relampago::before,.cv-relampago::after{content:"";position:absolute;background:#fff;border:1px solid #dbe6f5;border-radius:50%;box-shadow:0 4px 10px #0a2a6018}
+.cv-relampago::before{width:16px;height:16px;left:22px;bottom:-20px}
+.cv-relampago::after{width:9px;height:9px;left:10px;bottom:-31px}
 .cv-relampago[hidden],.cv-relampago-painel[hidden]{display:none}
-.cv-relampago.visivel{opacity:1;transform:none;animation:cv-relampago .8s ease-out}
-@keyframes cv-relampago{0%{box-shadow:0 0 0 0 #f2b705aa,0 18px 40px #0a2a6040}100%{box-shadow:0 0 0 18px #f2b70500,0 18px 40px #0a2a6040}}
-.cv-relampago-painel{display:flex;align-items:flex-start;gap:12px}
-.cv-relampago-ic{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--cv-azul-claro);color:var(--cv-azul)}
-.cv-relampago small{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--cv-cinza)}
-.cv-relampago small svg{color:var(--cv-dourado)}
-.cv-relampago b{display:block;margin:2px 0 4px;font-size:17px;color:var(--cv-tinta)}
-.cv-relampago p{margin:0;font-size:14px;line-height:1.45;color:var(--cv-texto)}
-.cv-relampago a{display:inline-block;margin-top:8px;font-size:14px;font-weight:700;color:var(--cv-azul)}
-.cv-relampago-fechar{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:4px;background:none;font-size:22px;line-height:1;color:var(--cv-cinza);cursor:pointer}
+.cv-relampago.visivel{opacity:1;transform:none}
+.cv-relampago-painel{animation:cv-relampago-troca .5s ease}
+@keyframes cv-relampago-troca{from{opacity:0}to{opacity:1}}
+.cv-relampago b{display:flex;align-items:center;gap:6px;margin:0 0 4px;font-size:14.5px;color:var(--cv-azul-esc)}
+.cv-relampago b .ic{color:var(--cv-dourado)}
+.cv-relampago p{margin:0;font-size:13px;line-height:1.45;color:var(--cv-texto)}
+.cv-relampago-pix{display:flex;align-items:center;gap:10px;margin-top:8px}
+.cv-relampago-pix a{font-size:12.5px;font-weight:700;color:var(--cv-azul)}
+.cv-relampago-fechar{position:absolute;top:8px;right:8px;width:24px;height:24px;border:0;border-radius:50%;background:none;font-size:17px;line-height:1;color:#8a95a6;cursor:pointer}
 .cv-relampago-fechar:hover{background:#eef2f7;color:var(--cv-tinta)}
-.cv-relampago-barra{position:absolute;left:0;right:0;bottom:0;height:3px;background:#eef2f7}
-.cv-relampago-barra i{display:block;width:100%;height:100%;background:var(--cv-dourado)}
-@media(max-width:640px){.cv-relampago{left:16px;right:16px;bottom:16px;width:auto}}
-@media(prefers-reduced-motion:reduce){.cv-relampago{transition:none}.cv-relampago.visivel{animation:none}}
+.cv-relampago-barra{position:absolute;left:22px;right:22px;bottom:7px;height:2px;border-radius:2px;background:#eef2f7;overflow:hidden}
+.cv-relampago-barra i{display:block;width:100%;height:100%;background:#c9d8ee}
+@media(max-width:640px){.cv-relampago{left:16px;bottom:30px;width:calc(100vw - 32px)}}
+@media(prefers-reduced-motion:reduce){.cv-relampago,.cv-relampago-painel{transition:none;animation:none}}
 @media print{.cv-relampago{display:none!important}}
+
+/* ---------- Acessibilidade: contraste (WCAG AA, 4.5:1) e foco visível em qualquer fundo ---------- */
+.badge-vip{background:linear-gradient(135deg,#b45309,#92400e)}
+.score-badge.excelente{background:#15803d}.score-badge.alto{background:#1d4ed8}.score-badge.medio{background:#b45309}.score-badge.baixo{background:#64748b}
+.pf-vazio,.pl-itens li.off{color:#64748b}
+body.cv :is(a,button,summary,[tabindex]):focus-visible{outline:3px solid #0a3a8c;outline-offset:2px;box-shadow:0 0 0 5px #ffbf47}
+
+/* ---------- Grade de assinaturas da página inicial: cada plano é um botão que leva ao plano na página de planos ---------- */
+a.cv-plano{position:relative;gap:2px;padding:12px 14px 12px;color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s,transform .15s}
+a.cv-plano:hover,a.cv-plano:focus-visible{border-color:var(--cv-azul);box-shadow:0 6px 16px #0a2a601f;transform:translateY(-2px)}
+a.cv-plano i{margin-top:4px;font-style:normal;font-size:12.5px;font-weight:700;color:var(--cv-azul)}
+a.cv-plano-dest i{color:#8a5f00}
+a.cv-plano-dest:hover{border-color:var(--cv-dourado)}
+.pl-link{display:block;margin-top:8px;font-size:13px;font-weight:600;color:var(--cv-azul)}
+.pl-card:target{outline:3px solid var(--cv-dourado);outline-offset:3px}
+@media(prefers-reduced-motion:reduce){a.cv-plano{transition:none}a.cv-plano:hover{transform:none}}
+
+/* ---------- Vitrine rotativa de vagas (página inicial): troca suave de um cartão por vez ---------- */
+[data-rotativo] > *{transition:opacity .45s ease,transform .45s ease}
+[data-rotativo] > .cv-saindo,[data-rotativo] > .cv-entrando{opacity:0;transform:translateY(8px)}
+.cv-rotativo-info{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-6px 0 12px;font-size:13px;color:var(--cv-cinza)}
+.cv-rotativo-info span{display:inline-flex;align-items:center;gap:5px}
+.cv-rotativo-info .ic{color:var(--cv-dourado)}
+.cv-rotativo-pausa{padding:4px 10px;border:1px solid var(--cv-linha);border-radius:999px;background:#fff;font:inherit;font-size:12.5px;font-weight:600;color:var(--cv-azul);cursor:pointer}
+.cv-rotativo-pausa:hover{background:var(--cv-azul-claro)}
+@media(prefers-reduced-motion:reduce){[data-rotativo] > *{transition:none}}

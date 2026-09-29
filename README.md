@@ -3,7 +3,9 @@
 Plataforma de vagas de emprego e capacitação profissional do Distrito Federal —
 Trabalho de Conclusão de Curso (TCC).
 
-**PHP 8.2 puro (padrão MVC)** · **MySQL/MariaDB (PDO)** · **XAMPP** · sem frameworks e sem dependências externas.
+**PHP 8.0 ou mais novo, puro (padrão MVC)** · **MySQL/MariaDB (PDO)** · **XAMPP** · sem frameworks e sem dependências externas.
+Testado no PHP 8.0.30 do XAMPP; o código não usa recursos do 8.1 em diante. Para publicar na internet, use PHP 8.2
+ou mais novo (o 8.0 não recebe mais correções de segurança).
 
 ## O que o sistema faz
 
@@ -11,10 +13,43 @@ Trabalho de Conclusão de Curso (TCC).
 |---|---|
 | Visitante | Vagas e cursos/e-books com busca e filtros; página de cada vaga e curso; planos. |
 | Candidato | Envia o currículo (PDF/DOCX/DOC) e a **máquina de extração** preenche o perfil; com o cadastro completo, ganha um **portfólio** automático e a **máquina de match** (nota de 0 a 100, explicada, com cada vaga); candidata-se e acompanha o retorno das empresas. |
-| Empresa | Publica vagas (cola o anúncio e a **extração de vagas** preenche o formulário), recebe candidaturas ordenadas pelo match e consulta o banco de talentos. |
-| Administrador | Gerencia usuários, categorias, cursos/e-books (com **extração de cursos**), vagas e candidaturas. |
+| Empresa | Publica vagas (envia o **cartaz** ou cola o anúncio e a **extração de vagas** preenche o formulário — o leitor de cartaz roda no navegador, sem instalar nada), recebe candidaturas ordenadas pelo match e consulta o banco de talentos. |
+| Administrador | Gerencia usuários, categorias, cursos/e-books (com **extração de cursos**), vagas e candidaturas, e acompanha a **máquina de aprendizado**. |
 
 Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premium**.
+
+## Novidades desta versão (27/09/2026)
+
+- **Leitor de cartaz sem instalação**: o OCR roda no navegador (Tesseract.js servido pelo próprio site). Ninguém
+  instala nada, nem no servidor nem no computador; o Tesseract do servidor virou reserva opcional.
+- **Carregador**: amarelo enquanto carrega ou lê (com %), azul quando está pronto, em toda máquina de extração;
+  também impede o clique duplo. O "Extrair" com a caixa vazia não gera mais relatório em branco.
+- **Cartaz mais bem lido**: shopping não vira empresa, marca em linhas separadas é confirmada pelo e-mail do
+  cartaz ("Smile & Face"), palavra grudada pelo OCR é separada, "R$ 700 VT/VR" não conta como salário e até
+  3 cargos em letra grande entram no título.
+- **Biblioteca de e-books**: da pesquisa direto para o botão **Baixar**. A ficha tem o campo `PDF:`; ao salvar,
+  o sistema baixa o PDF (ou acha o PDF na página do e-book) e credita a fonte original. O botão
+  **Trazer os PDFs para a biblioteca** traz os antigos de uma vez.
+- **LGPD**: o candidato exclui a própria conta e todos os dados dele (Meu perfil → Seus dados); o log de troca de
+  senha só existe no modo de demonstração e com o e-mail mascarado.
+- **Testes de jornada** (`tests/jornadas.php`): uma conta temporária usa o sistema pelo navegador — cadastro,
+  login, currículo, candidatura, extração, troca de senha e exclusão da conta — e é apagada no fim. Roda antes de
+  cada commit, junto da sintaxe e do teste rápido.
+- **Correções**: erro no cadastro em lote de e-books (recurso do PHP 8.1 no XAMPP 8.0), entrega de PDF grande em
+  internet lenta, prévia do cartaz quebrada, importação do banco no PowerShell e versão do PHP no README.
+
+**Varredura final (27/09/2026)**: 1.701 páginas rastreadas nos 4 perfis sem nenhum problema; teste rápido 119/119;
+jornadas 18/18; bateria de segurança (XSS, SQL injection, CSRF, sessão, uploads, permissões) aprovada; 114/114
+tabelas íntegras; nenhum erro de PHP no servidor; páginas sem transbordar no celular. Ressalvas conhecidas, para
+depois da banca: ajustes de acessibilidade (pulos de título, rótulos de alguns campos) e ícone da aba (favicon).
+
+## Dia da apresentação (roteiro rápido)
+
+1. Notebook **na tomada** (na bateria o processador desacelera e o leitor de cartaz leva o dobro do tempo).
+2. XAMPP: **Start** no Apache e no MySQL.
+3. Clique duplo em `tests\verificar.bat` e espere **TUDO CERTO**.
+4. Abra uma vez **Painel → Vagas** (o leitor de cartaz fica carregado e fica azul).
+5. Ao terminar: **Stop** no MySQL antes de fechar o XAMPP ou desligar o computador.
 
 ## Instalação (XAMPP no Windows)
 
@@ -23,15 +58,23 @@ Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premiu
    O `mod_rewrite` do Apache (já ativo no XAMPP) é necessário.
 3. Importe o banco — primeiro a estrutura, depois os dados de demonstração:
    - phpMyAdmin → Importar → `database/schema.sql` e depois `database/seed.sql`; **ou**
-   - no terminal, dentro da pasta do projeto:
+   - no **Prompt de Comando (cmd)**, dentro da pasta do projeto (no PowerShell o `<` não funciona):
      ```
      C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < database\schema.sql
      C:\xampp\mysql\bin\mysql.exe -u root --default-character-set=utf8mb4 < database\seed.sql
      ```
    O `schema.sql` apaga e recria **só** o banco `conecta_vagas_df_v2`.
 4. Se o MySQL tiver senha, ajuste `DB_PASS` em `config/config.php`.
-5. Acesse `http://localhost/<pasta do projeto>/` — ex.: `http://localhost/TCC%20v2/TCC_GUSTAVO/`.
+5. Acesse `http://localhost/<pasta do projeto>/` — nesta máquina: **`http://localhost/conecta%20vagas%20df%20tcc/`**
+   (espaços no nome da pasta viram `%20`).
 6. Confira se está tudo certo: `C:\xampp\php\php.exe tests\smoke.php`
+7. **Biblioteca de e-books** (precisa de internet, uma vez só): entre como administrador → **Cursos e e-books** →
+   **Trazer os PDFs para a biblioteca**. Os PDFs dos e-books são baixados para `storage/uploads/` (arquivos
+   enviados não vão para o Git) e o botão deles passa de "Acessar" para **"Baixar"**. Sem esse passo, tudo
+   funciona igual, só que os e-books abrem no site de origem.
+
+**Nada mais para instalar.** O leitor de cartaz das vagas (OCR) vem com o site e roda no navegador; os PDFs e
+os currículos são lidos em PHP puro. Tesseract e Poppler no servidor são opcionais (só reserva).
 
 ### Contas de teste
 
@@ -42,6 +85,28 @@ Planos demonstrativos (sem cobrança real): **Candidato VIP** e **Empresa Premiu
 | Candidato | candidato@conectavagas.com | Candidato@123 |
 
 Troque as senhas antes de publicar o sistema.
+
+### Não consegue entrar?
+
+- **Confira o que foi digitado** com o botão do olho, ao lado do campo de senha. O login tolera os erros mais
+  comuns: primeira letra trocada (`admin@123` entra como `Admin@123`), Caps Lock ligado (`aDMIN@123`) e
+  espaços no começo ou no fim.
+- **No ambiente local** (acesso pelo próprio computador) a mensagem diz o motivo exato: e-mail sem conta,
+  senha incorreta ou conta desativada. Acessando de outra máquina ou com `APP_DEBUG=0`, a mensagem é única
+  (não revela quais e-mails têm conta).
+- **Login em pausa**: depois de **8 senhas erradas** para o mesmo e-mail (a tela avisa quando faltam 3), o
+  login daquele e-mail pausa por **5 minutos** e libera sozinho. Os limites ficam em `config/config.php`
+  (`LOGIN_MAX_TENTATIVAS`, `LOGIN_JANELA_MINUTOS`).
+- **"Sua sessão foi encerrada porque a senha da conta foi alterada"**: a senha daquela conta mudou (pelo
+  "Esqueci minha senha", pelo administrador ou pelo comando abaixo). Basta entrar de novo com a senha nova.
+- **Reconectar as senhas de teste** (volta as 3 contas às senhas da tabela acima, reativa as contas e tira
+  qualquer pausa do login):
+  ```
+  C:\xampp\php\php.exe database\resetar_senhas.php
+  ```
+- **"Esqueci minha senha"**: no modo de demonstração (acesso pelo próprio computador, sem e-mail configurado), o
+  link de redefinição aparece na tela e fica em `storage/logs/redefinicoes_senha.log`, com o e-mail mascarado
+  (`ca*******@conectavagas.com`). Com `APP_DEBUG=0` (produção), o link não vai para o log: seria enviado por e-mail.
 
 ## Estrutura de pastas
 
@@ -56,20 +121,34 @@ TCC_GUSTAVO/
 │   ├── DTO/               objetos que levam os dados do formulário até o banco
 │   ├── Models/            acesso ao banco, uma classe por tabela (M do MVC)
 │   ├── Services/          regras de negócio: match, competências, portfólio e extração
-│   │   └── Extracao/      leitura de PDF/DOCX/DOC e extração de currículo, vaga e curso
+│   │   ├── Extracao/      leitura de PDF/DOCX/DOC e extração de currículo, vaga e curso
+│   │   └── Aprendizado/   aprendizado de máquina das extrações (Naive Bayes que aprende com as revisões)
 │   └── Views/             telas em HTML + PHP (V do MVC): layouts, partes reutilizáveis e páginas
 ├── config/config.php      configurações (banco, depuração, limites, pastas)
 ├── database/
 │   ├── schema.sql         estrutura do banco (tabelas, chaves, índices)
-│   └── seed.sql           dados de demonstração (contas, vagas, cursos)
+│   ├── seed.sql           dados de demonstração (contas, vagas, cursos)
+│   └── resetar_senhas.php volta as senhas das contas de teste e libera o login (só pelo terminal)
 ├── docs/ARQUITETURA.md    como o sistema funciona por dentro (leia para a apresentação)
+├── docs/APRENDIZADO.md    a máquina de aprendizado: ideia, algoritmo, arquivos e roteiro de demonstração
+├── docs/PESQUISA_CURSOS.md  pesquisa guiada: de onde vêm os links dos novos cursos e e-books
+├── docs/PROMPTS_PESQUISA.md prompt padrão para as IAs de pesquisa (gerado por docs/gerar_prompts.php)
+├── .githooks/pre-commit   blindagem: antes de cada commit confere a sintaxe e roda o teste rápido
 ├── public/                ÚNICA pasta servida pelo Apache
 │   ├── index.php          front controller: porta de entrada de todas as páginas + tabela de rotas
 │   └── assets/            CSS, JavaScript e imagens (carrossel, cartazes das vagas, capas dos cursos)
+│       └── js/vendor/tesseract/  leitor de cartaz da plataforma (Tesseract.js + português), servido pelo próprio site
 ├── storage/               arquivos gerados pelo sistema (inacessível pelo navegador)
 │   ├── uploads/           currículos, fotos, logos e cartazes enviados
-│   └── logs/              registros internos (ex.: links de redefinição de senha)
-└── tests/smoke.php        teste rápido: classes, regras, banco e páginas
+│   ├── logs/              registros internos (ex.: links de redefinição de senha, só no modo de demonstração)
+│   └── backups/           cópias do banco e dos uploads (fora do git), com COMO_RESTAURAR.txt
+└── tests/
+    ├── smoke.php          teste rápido: classes, regras, banco e páginas
+    ├── jornadas.php       o sistema usado como uma pessoa usa: cadastro, login, currículo, candidatura,
+    │                      extração de vagas e cursos, troca de senha e exclusão da conta (conta temporária)
+    ├── amostras/          leituras reais de cartazes feitas pelo leitor do navegador (usadas nos testes)
+    ├── lint.php           confere a sintaxe de todos os arquivos PHP
+    └── verificar.bat      clique duplo: sintaxe + teste rápido + jornadas, com o resultado na tela
 ```
 
 ## Como uma página é montada
@@ -88,6 +167,78 @@ Os endereços são os mesmos das versões anteriores (`vaga.php?id=3`, `view/per
 
 Detalhes — camadas, tabela completa de rotas, máquinas de extração e de match, regras dos planos,
 segurança e o mapa "onde estava → onde está": **[docs/ARQUITETURA.md](docs/ARQUITETURA.md)**.
+
+## Cadastrar cursos e e-books (com ajuda de outra IA)
+
+Em **Painel → Cursos e e-books** há uma caixa só, **Extrair**:
+
+1. peça a uma IA de pesquisa (Perplexity, ChatGPT, Gemini…) que pesquise os links ou títulos e responda no
+   **modelo de ficha** (Título, Tipo, Instituição, Modalidade, Cidade, Nível, Carga horária, Gratuito, Preço, Área,
+   Link, Imagem, Descrição). O prompt padrão está em **[docs/PROMPTS_PESQUISA.md](docs/PROMPTS_PESQUISA.md)**;
+2. cole a resposta em **Extrair**: **uma ficha** (ou um texto de divulgação) preenche o formulário para revisar e
+   salvar; **várias fichas** (separadas por `---`) abrem uma prévia para cadastrar de uma vez;
+3. **com imagem** na ficha, ela é conferida e baixada; **sem imagem**, o conteúdo entra com a **imagem padrão** da
+   plataforma e a lista mostra *trocar imagem* (filtro "Com imagem padrão") — edite quando tiver a imagem certa;
+4. **Baixar × Acessar**: envie o PDF do e-book no cadastro e ele fica na **biblioteca** da plataforma (botão
+   **Baixar**, baixa direto); conteúdo que fica em outro site mostra **Acessar** (abre em nova aba).
+
+Fontes oficiais para pesquisar: [docs/PESQUISA_CURSOS.md](docs/PESQUISA_CURSOS.md).
+
+## Manutenção automática (ninguém precisa calibrar nada)
+
+Ao abrir a **visão geral** do painel, no máximo uma vez por dia, o sistema sozinho:
+- faz a **máquina de aprendizado estudar** o que foi cadastrado e revisado (vagas, cursos e perfis públicos),
+  recalibrar a confiança e conferir o desempenho **recente**: se ela começar a errar, volta a valer a regra até ela
+  provar de novo. Correção contraditória também se resolve sozinha (vale a mais recente). Ela não aparece no menu;
+- **limpa arquivos órfãos** de `storage/uploads` (sem registro que os use e com mais de 24 h).
+
+**Foto do currículo**: ao enviar o currículo (PDF ou DOCX), a foto é encontrada pelo padrão de foto de currículo
+(tons de pele, fotografia, proporção de retrato — ignora logotipos, ícones e página escaneada) e vira a foto do
+perfil; se o perfil já tiver foto, a do currículo aparece no relatório para o candidato escolher trocar.
+
+## Blindagem do código (antes e depois de mexer)
+
+- **Clique duplo em `tests\verificar.bat`**: confere a sintaxe de todos os PHP, roda o teste rápido e as jornadas
+  (`tests/jornadas.php`: uma conta temporária faz cadastro, login, currículo, candidatura e exclusão da conta pelo
+  navegador, e é apagada no fim — nada fica no banco). No fim
+  aparece **TUDO CERTO** ou o que quebrou (com arquivo e linha). Faça isso depois de cada alteração.
+- **Commit protegido**: o gancho `.githooks/pre-commit` roda a mesma verificação antes de cada commit (pelo
+  terminal ou pelo VS Code). Se algo quebrou, o commit é **barrado** e o motivo aparece; os relatórios completos
+  ficam em `.git/smoke_ultimo.txt` e `.git/jornadas_ultimo.txt`. Precisa do Apache e do MySQL ligados. Emergência: `git commit --no-verify`.
+- O gancho já está ligado nesta máquina. Em uma cópia nova do projeto, ligue com:
+  ```
+  git config core.hooksPath .githooks
+  ```
+- Quebrou e não sabe onde? Volte ao último ponto estável: `git checkout teste-cliente-2026-09-26`
+  (o banco volta pelo backup, ver "Backup e restauração").
+
+## Segurança (resumo)
+
+- Senhas com `password_hash` (bcrypt); pausa automática do login contra força-bruta (ver acima).
+- Token CSRF em todo formulário; SQL sempre com parâmetros (`?`); todo texto na tela passa por `e()`.
+- Cada ação confere a permissão: candidato só mexe no que é dele, empresa só nas próprias vagas e
+  candidaturas, e o currículo só abre para o dono, para a empresa que o recebeu ou para empresa Premium.
+- Só `public/` é servida e, dentro dela, só o `index.php` executa PHP. Configuração, banco, backups,
+  documentos, `.git` e arquivos ocultos respondem 403.
+- Cabeçalhos: `Content-Security-Policy` (formulários só para o próprio site), `X-Frame-Options`,
+  `X-Content-Type-Options`, `Referrer-Policy` e `Permissions-Policy`; a versão do PHP não é anunciada.
+- **LGPD**: consentimento no cadastro; o candidato exclui a própria conta em **Meu perfil → Seus dados → Excluir
+  minha conta** (confirma com a senha) — saem o perfil, os currículos e arquivos, a foto, as candidaturas, o match,
+  as tentativas de login e as lições que a máquina aprendeu com ele. Os logs não guardam e-mail inteiro.
+- Detalhes em [docs/ARQUITETURA.md](docs/ARQUITETURA.md) (seção de segurança).
+
+## Backup e restauração
+
+- Ponto de restauração do código: tag `teste-cliente-2026-09-26` (`git checkout teste-cliente-2026-09-26`).
+- Banco e arquivos enviados: `storage/backups/<data>/` tem o `.sql` do banco, o `uploads.zip` e o passo a
+  passo (`COMO_RESTAURAR.txt`). Para voltar o banco, dentro da pasta do backup:
+  ```
+  C:\xampp\mysql\bin\mysql.exe -u root < banco_conecta_vagas_df_v2.sql
+  ```
+- Fazer um backup novo:
+  ```
+  C:\xampp\mysql\bin\mysqldump.exe -u root --single-transaction --databases conecta_vagas_df_v2 > storage\backups\banco.sql
+  ```
 
 ## Depuração e produção
 

@@ -1,0 +1,22 @@
+@startuml
+!include estilo.iuml
+mainframe sd Pesquisar vagas
+autonumber "0:"
+hide footbox
+
+actor Visitante as V
+boundary ":TelaVagas" as T
+control ":VagaController" as C
+entity ":VagaDAO" as D
+entity ":MatchDAO" as M
+V -> T ++ : informar termo e filtros
+T -> C ++ : lista(filtros)
+C -> D ++ : listar(true, filtros)
+D --> C -- : vagas abertas
+opt usuário é candidato
+  C -> M ++ : mapaPorCandidato(perfilId)
+  M --> C -- : notas de match
+end
+C --> T -- : vagas paginadas
+T --> V -- : exibir vagas
+@enduml

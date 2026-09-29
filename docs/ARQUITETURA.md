@@ -62,7 +62,7 @@ View: layouts/header.php + vagas/lista.php + layouts/footer.php  ──► HTML
 |---|---|
 | `HomeController` | início (`index.php`), termo de privacidade (`contrato.php`) |
 | `VagaController` | lista de vagas (`vagas.php`), página da vaga (`vaga.php`) |
-| `CursoController` | lista de cursos/e-books (`cursos.php`), página do curso (`curso.php`) |
+| `CursoController` | listas separadas por formato: cursos (`cursos.php`), e-books (`?tipo=ebook`) e vídeos (`?tipo=video`); página do conteúdo (`curso.php`) |
 | `CandidaturaController` | candidatar-se (`candidatar.php`), cancelar candidatura |
 | `PlanosController` | planos e assinaturas (`planos.php`) |
 | `AuthController` | login, cadastro, sair |
@@ -70,7 +70,9 @@ View: layouts/header.php + vagas/lista.php + layouts/footer.php  ──► HTML
 | `PerfilController` | meu perfil, salvar perfil, portfólio, recalcular match |
 | `CurriculoController` | envio do currículo (extração), aplicar dados do relatório, excluir currículo |
 | `ArquivoController` | imagens enviadas (`assets/uploads/...`), download do currículo (`download.php`) |
-| `AdminController` | painel (`admin/index.php`), usuários, categorias, cursos |
+| `AdminController` | painel (`admin/index.php`), usuários, categorias, cursos, assinaturas |
+| `AprendizadoController` | painel "Aprendizado da máquina" (`admin/pages/aprendizado.php`) |
+| `AprendeComRevisao` (*trait*) | usada pelos controllers com extração: guarda a sugestão da máquina e aprende quando o formulário é salvo |
 | `EmpresaController` | vagas (com extração), candidaturas recebidas, banco de talentos, perfil da empresa |
 
 ### app/Models — acesso ao banco (DAO)
@@ -86,6 +88,7 @@ View: layouts/header.php + vagas/lista.php + layouts/footer.php  ──► HTML
 | `CandidaturaDAO` | `candidaturas` |
 | `MatchDAO` | `matches` |
 | `AssinaturaDAO` | `assinaturas` + regras dos planos |
+| `AprendizadoDAO` | `aprendizado_exemplos`, `aprendizado_palavras`, `aprendizado_revisoes`, `aprendizado_provas` (máquina de aprendizado) |
 
 ### app/Services — regras de negócio
 
@@ -99,6 +102,11 @@ View: layouts/header.php + vagas/lista.php + layouts/footer.php  ──► HTML
 | `Extracao/AplicacaoCurriculo` | Aplica os dados extraídos no perfil (preenche, mantém ou mescla). |
 | `Extracao/ExtracaoVaga` | Texto de um anúncio → campos da vaga. |
 | `Extracao/ExtracaoCurso` | Texto de divulgação → campos do curso. |
+| `Aprendizado/MaquinaAprendizado` | Aprendizado de máquina das extrações: decisão híbrida regra × modelo, aprender com a revisão. Ver [APRENDIZADO.md](APRENDIZADO.md). |
+| `Aprendizado/NaiveBayes` | O classificador (aprender, esquecer, prever e explicar). |
+| `Aprendizado/Tokenizador` | Texto → palavras que o classificador conta. |
+| `Aprendizado/CorrecaoHumana` | Compara a sugestão da extração com o que a pessoa salvou e tira as lições. |
+| `Pix` | Código Pix "copia e cola" (BR Code do Banco Central, com CRC16) do QR Code de doação do rodapé. |
 
 ### app/Views — telas
 
@@ -134,6 +142,7 @@ Definida em `public/index.php`. As rotas aceitam GET (mostrar) e POST (enviar fo
 | `view/perfil/salvar.php` | `PerfilController::salvar` | — (redireciona) | candidato |
 | `view/perfil/portfolio.php[?id=]` | `PerfilController::portfolio` | `perfil/portfolio` | dono; outros se o perfil for público |
 | `view/perfil/recalcular_match.php` | `PerfilController::recalcularMatch` | — | candidato |
+| `view/perfil/conta_excluir.php` | `PerfilController::excluirConta` | — | candidato |
 | `view/perfil/curriculo_upload.php` | `CurriculoController::upload` | — | candidato |
 | `view/perfil/aplicar_extracao.php` | `CurriculoController::aplicarExtracao` | — | candidato |
 | `view/perfil/curriculo_excluir.php` | `CurriculoController::excluir` | — | candidato |
@@ -145,6 +154,8 @@ Definida em `public/index.php`. As rotas aceitam GET (mostrar) e POST (enviar fo
 | `admin/pages/usuarios.php` | `AdminController::usuarios` | `admin/usuarios` | admin |
 | `admin/pages/categorias.php` | `AdminController::categorias` | `admin/categorias` | admin |
 | `admin/pages/cursos.php` | `AdminController::cursos` | `admin/cursos` | admin |
+| `admin/pages/assinaturas.php` | `AdminController::assinaturas` | `admin/assinaturas` | admin |
+| `admin/pages/aprendizado.php` | `AprendizadoController::painel` | `admin/aprendizado` | admin |
 | `admin/pages/vagas.php` | `EmpresaController::vagas` | `admin/vagas` | empresa (suas vagas) e admin |
 | `admin/pages/candidaturas.php` | `EmpresaController::candidaturas` | `admin/candidaturas` | empresa e admin |
 | `admin/pages/talentos.php` | `EmpresaController::talentos` | `admin/talentos` | empresa e admin |
@@ -169,6 +180,9 @@ Definida em `public/index.php`. As rotas aceitam GET (mostrar) e POST (enviar fo
 A empresa faz um caminho parecido para vagas: cola o anúncio → `ExtracaoVaga` preenche → publica →
 o match é recalculado com todos os candidatos.
 
+Em todas as extrações (vaga, curso e currículo), a revisão salva ensina a **máquina de aprendizado**: as correções
+feitas na revisão viram lições que a extração passa a usar. Detalhes e roteiro de demonstração: [APRENDIZADO.md](APRENDIZADO.md).
+
 ---
 
 ## 5. Máquina de extração
@@ -185,13 +199,134 @@ o match é recalculado com todos os candidatos.
 - Aplicação no perfil: campo vazio **recebe** o valor; campo preenchido é **mantido** (a não ser que o candidato
   marque "Substituir"); listas são **mescladas**; o nome da conta só muda se o candidato confirmar no relatório.
 
-**Vagas** (painel → Vagas): cola-se o anúncio (WhatsApp, Instagram, site) e o sistema preenche título,
-salário (ignora VR/VT), cidade, tipo, nível, modelo, requisitos, benefícios e área.
+**Vagas** (painel → Vagas): envia-se o **cartaz** (imagem, lido por OCR pelo leitor da plataforma) ou cola-se o anúncio
+(WhatsApp, Instagram, site) e o sistema preenche título, empresa anunciante, salário (ignora VR/VT), cidade, tipo,
+nível, modelo, descrição, requisitos, benefícios, contato, quantidade de vagas e área.
+- A leitura começa ao escolher o arquivo (prévia do cartaz na tela); o cartaz vira a imagem da vaga.
+- **Relatório da extração**, campo a campo, como o do currículo: *lido do anúncio*, *valor padrão* (o anúncio não diz —
+  ex.: nível "Júnior") ou *não encontrado*, com os avisos do que conferir.
+- O texto lido no cartaz fica numa caixa editável: corrige-se o que o OCR leu errado e extrai-se de novo, mantendo o cartaz.
+- A descrição ganha uma frase de abertura montada com o que foi lido ("Grupo Dourado contrata Auxiliar de Cozinha em Águas Claras.").
+- Seções curtas ("Horário:", "Local:") não engolem as linhas seguintes; códigos de vaga "(cód. 1308)", prefixos
+  "Temporário -" e frases "está contratando X" são tratados no título.
+- **Leitor de cartaz da plataforma — nada para instalar**: o OCR roda no navegador de quem envia o cartaz
+  (`public/assets/js/leitor-cartaz.js` + Tesseract.js 7 em WebAssembly e o português `best_int`, tudo em
+  `public/assets/js/vendor/tesseract/`, servido pelo próprio site). Ele faz as mesmas 4 leituras do servidor (imagem em
+  cinza + gama ampliada para ~2200 px e o negativo, cada uma em psm 3 e 11) e envia os TSVs junto com o cartaz;
+  `OcrImagem::leiturasDoNavegador` valida (1 a 4 textos UTF-8, até 1,5 MB, formato do Tesseract) e `OcrImagem::montar`
+  aplica a mesma calibragem. Leitura forjada ou inválida é ignorada e o servidor lê sozinho.
+- Tesseract **no servidor** é opcional: só é usado quando o navegador não conseguiu ler (sem JavaScript, pouca memória).
+- **Carregador**: amarelo enquanto carrega o leitor ou lê o cartaz (com %), azul quando está pronto; o mesmo
+  carregador aparece em toda máquina de extração (anúncio, fichas de cursos, currículo) e trava o envio duplo.
+- Calibragem do cartaz (`OcrImagem` + `ExtracaoVaga`): as 4 leituras do Tesseract rodam em paralelo (1 thread cada,
+  TSV em arquivo, tempo máximo de 90 s; se falhar, uma por uma, e leitura vazia é tentada de novo); cinza e gama são
+  aplicados na imagem original antes de ampliar. Na extração: palavra partida pelo OCR é juntada quando aparece
+  inteira em outra leitura ("MÁQUI NA" → "MÁQUINA"); cargo em várias linhas de letra grande vira um título só
+  ("Operador de Máquina Costal (Roçadeira)"); slogans (`SLOGANS`) e restos de logotipo não entram em campo nenhum;
+  nome de empresa não aceita pedaço de palavra ("RO LUGAR"); "R$ 48,00 ror DIA" vira "por dia" e o valor por dia
+  vai para o vale refeição. O cartaz real que motivou isso é um teste permanente em `tests/smoke.php`.
+  Depois, com o cartaz Smile & Face e o da Mimória (leituras reais do navegador em `tests/amostras/`): shopping ou ponto
+  conhecido ("CONJUNTO NACIONAL") não é empresa; ramo sozinho ("ODONTOLOGIA") não continua o cargo; marca em linhas
+  separadas é confirmada pelo e-mail ("SMILE" + "& FACE" … admsmileface@… → "Smile & Face"); palavra grudada pelo OCR
+  é separada quando outra leitura tem as duas ("CONSULTORDE" → "CONSULTOR DE"); "R$ 700,00 VT/VR" é valor de vale e
+  "CLT: R$ 2.200" / "ESTÁGIO: R$ 1.000" são salários declarados.
 
 **Cursos** (painel → Cursos e e-books): cola-se a divulgação e o sistema preenche título, instituição, link,
 carga horária, gratuito/preço, modalidade, nível, formato e categoria.
 
-Nada é gravado sem revisão: a extração de vagas e cursos só preenche o formulário.
+**Importação em lote de cursos e e-books** (painel → Cursos e e-books → "Importar vários"):
+1. o painel monta um **prompt de pesquisa guiada** (`FontesCursos::prompt` — formato, área ou lacunas, fontes oficiais
+   e os links já cadastrados; roteiro completo em **[PESQUISA_CURSOS.md](PESQUISA_CURSOS.md)**)
+   para colar numa IA de pesquisa (Perplexity, ChatGPT); ela responde em **fichas** (Título, Tipo, Instituição,
+   Modalidade, Cidade, Nível, Carga horária, Gratuito, Preço, Área, Link, Descrição), separadas por `---`;
+2. cola-se a resposta inteira: `ExtracaoCurso::fichas()` limpa o Markdown, separa as fichas e passa cada uma pela
+   extração normal (os campos rotulados têm prioridade); presencial guarda a cidade na descrição;
+3. a **prévia** mostra cada ficha como "Pronto", "Sem link válido" ou "Já cadastrado"; só as marcadas são gravadas,
+   publicadas e com o banner da instituição (`ExtracaoCurso::capa()` — as capas de `assets/img/cursos` levam a marca
+   da instituição, então nunca são escolhidas pela área; sem banner, o cartão mostra o ícone do formato).
+
+**Cursos, e-books e vídeos separados**: cada formato tem a sua página — `cursos.php` (só cursos), `cursos.php?tipo=ebook`
+(só e-books) e `cursos.php?tipo=video` (só vídeos) —, o seu item no menu, a sua seção na página inicial e, na página
+do conteúdo, "Outros" do mesmo formato (`pt_secao_formato()` em `partials/componentes.php`).
+
+Nada é gravado sem revisão: a extração de vagas e cursos só preenche o formulário (ou a prévia da importação).
+
+**Tabelas do painel (CRUD)**: usuários, categorias, cursos/e-books/vídeos, assinaturas e vagas têm colunas ordenáveis
+(`painel_th()`: clicar ordena, clicar de novo inverte), filtros e paginação (`painel_paginacao()`); candidaturas e
+banco de talentos têm "Ordem:" no filtro. A lógica fica em `app/Core/helpers.php` (`lista_ordem()`, `ordenar_linhas()`,
+`paginar()`, `painel_qs()`) — as ações (salvar, publicar, excluir) voltam para a mesma aba, filtros, ordem e página.
+Abrir "Editar"/"Ver" de um registro que não existe mais avisa e volta para a lista (`registro_encontrado()`).
+Padrão visual das listas (em `partials/graficos.php`, estilo Bootstrap sem dependência externa): a **foto** de cada
+vaga, curso e e-book (`painel_miniatura()`); a **chave liga/desliga** da situação (`painel_chave()`: Aberta/Pausada,
+Publicado/Oculto, Ativo/Bloqueado, Ativa/Inativa — botão `role="switch"` num formulário POST com CSRF); e a
+**barra de ações** numa linha (`painel_botoes()`: Ver, Editar, Encerrar/Reabrir, Excluir, com ícone e cor por ação).
+
+**Cadastro de cursos e e-books** (painel → Cursos e e-books): uma caixa só, **Extrair**. Uma ficha (ou texto de
+divulgação) preenche o formulário; várias fichas abrem a prévia de importação. O formato da ficha é um só
+(`PromptsPesquisa::formatoFicha`, o mesmo que `ExtracaoCurso::fichas()` lê); o prompt padrão das IAs de pesquisa
+fica fora do painel, em [PROMPTS_PESQUISA.md](PROMPTS_PESQUISA.md) (gerado por `docs/gerar_prompts.php`).
+- Imagem: a da ficha é conferida (`ImagemRemota::completar`) e baixada ao salvar (`ImagemRemota::baixar`); sem
+  imagem, entra o banner da instituição ou a **imagem padrão** (`CursoDAO::IMAGENS_PADRAO`, em
+  `public/assets/img/padrao/`), e a lista marca *trocar imagem*.
+- **Biblioteca**: o PDF enviado no cadastro vai para `storage/uploads/biblioteca_*.pdf` (conferido pelo conteúdo,
+  até 25 MB) e é entregue ao público por `ArquivoController::imagem` — só PDFs com esse prefixo, então currículo
+  nunca sai por ali. O botão é decidido pelo endereço (`pt_acesso_conteudo`): biblioteca → **Baixar** (download);
+  web → **Acessar** (nova aba).
+- **Da pesquisa direto para a biblioteca**: a ficha tem o campo **PDF:** (link direto do arquivo do e-book gratuito,
+  pedido no prompt). Ao salvar um e-book com "Guardar o PDF na nossa biblioteca" marcado (padrão para e-book), ou
+  ao cadastrar um lote com a opção da prévia, `ImagemRemota::pdfs` baixa o PDF — do campo PDF, do link oficial ou
+  achado na página (`pdfDaPagina`: metatag `citation_pdf_url` dos repositórios como o eduCAPES, ou o link
+  "baixar/e-book" da página). Download direto para o disco (sem ocupar memória), 6 por vez, até 150 MB e 180 s cada,
+  só de servidor público (inclusive depois de redirecionamentos) e só PDF inteiro (tipo conferido e fim `%%EOF`).
+  A descrição ganha "Fonte original: <link>" (crédito). Sem PDF público no link, o conteúdo fica com "Acessar".
+- Botão **Trazer os PDFs para a biblioteca** (aparece enquanto houver e-book com link da web): faz o mesmo com todos
+  de uma vez — é o passo que os colegas rodam depois de importar o `seed.sql`, já que `storage/uploads` não vai
+  para o Git. A entrega de PDF grande não é cortada pelo limite de tempo do PHP (`set_time_limit(0)` + `readfile`).
+- A instituição é padronizada pelo link oficial ao salvar e ao importar (`FontesCursos::nomeOficial`).
+
+**Manutenção automática** (`manutencao_diaria()` em `app/Core/Upload.php`, disparada pela visão geral do
+administrador, no máximo 1x por dia): limpa arquivos órfãos de `storage/uploads` (`limpar_uploads_orfaos`: sem
+registro que os use e com mais de 24 h) e chama `MaquinaAprendizado::manutencaoAutomatica()` (estuda o histórico,
+recalibra; as provas guardam só a janela recente — `AprendizadoDAO::JANELA_PROVAS` — então a máquina perde a
+liberação sozinha se piorar). A tela técnica da máquina saiu do menu (continua em `admin/pages/aprendizado.php`).
+
+**Foto do currículo** (`LeitorDocumento::extrairFoto`): candidatas do DOCX (`word/media`) e do PDF (JPEG e imagens
+FlateDecode RGB/cinza remontadas em PNG por `PdfTexto::imagens`); vence a de maior `pontuacaoFoto` (tons de pele,
+variedade de cores, proporção de retrato; descarta logotipo, ícone, banner e página A4 escaneada), salva como JPEG
+de até 800 px. Sem foto no perfil, é aplicada; com foto, fica como opção no relatório da extração.
+
+**Blindagem do código**: `tests/lint.php` (sintaxe de todos os PHP), `tests/verificar.bat` (lint + smoke com
+clique duplo) e o gancho `.githooks/pre-commit` (`git config core.hooksPath .githooks`), que barra o commit se a
+sintaxe ou o teste rápido falharem. `.gitattributes` mantém o gancho em LF e o `.bat` em CRLF.
+
+**Assinaturas** (painel → Assinaturas, só administrador): concede o plano da conta (candidato → Candidato VIP,
+empresa → Empresa Premium) por N dias, edita valor/datas/situação, cancela (mantém o histórico) e exclui. Cada conta
+tem no máximo uma assinatura ativa; se a empresa perde o Premium, o destaque das vagas sai. Os preços ficam em
+`AssinaturaDAO::PRECOS` (os mesmos de `planos.php`). A ficha do usuário liga para as assinaturas e as vagas da conta.
+
+**Vitrine rotativa da página inicial**: vagas, cursos e e-books mostram 5 cartões e trocam um por vez com os
+demais da fila (`[data-rotativo]` em `app.js`), cada seção num ritmo (4,5 s, 5,2 s e 5,9 s) para não trocarem juntas;
+pausa com o mouse/foco em cima, no botão "Pausar" ou para quem prefere menos movimento.
+
+**Aprendizado de máquina**: as regras acima são a base. Linhas soltas do anúncio, área da vaga/curso, empresa ou
+instituição não reconhecida e linhas do currículo sem título de seção também passam pela `MaquinaAprendizado`
+(Naive Bayes e memória de nomes), que aprende com cada revisão salva e só decide quando tem lições e confiança
+suficientes e já passou no "período de experiência" (acertou 90% das provas feitas com lições que ainda não
+conhecia); senão vale a regra. Nas vagas e nos cursos, o relatório da extração mostra o que a máquina decidiu e
+por quê. Detalhes em [APRENDIZADO.md](APRENDIZADO.md).
+
+### CRUD do painel
+
+| Tela | Criar | Ver | Editar | Ativar / desativar | Excluir | Filtros da lista |
+|---|---|---|---|---|---|---|
+| Vagas | formulário + extração | página pública da vaga | `?edit=` | Ativar · Pausar · Encerrar (reativar respeita o limite do plano) | sim | situação e busca |
+| Cursos e e-books | formulário + extração | página pública do curso | `?edit=` | Publicar · Ocultar | sim | formato e busca |
+| Usuários | formulário | ficha da conta (`?ver=`) | `?edit=` | Ativar · Bloquear (nunca a própria conta nem o último admin) | sim | tipo e busca |
+| Categorias | formulário | vagas/cursos da categoria | `?edit=` | Ativar · Desativar | sim | — |
+| Candidaturas | (pelo candidato) | portfólio e currículo | status + retorno | — | admin | vaga e status |
+
+Toda ação que muda dados é um formulário POST com token CSRF (`painel_acao()`), confere a permissão no servidor e
+volta para a mesma lista filtrada (`volta_filtros()`).
 
 ---
 
@@ -240,9 +375,16 @@ Nada é gravado sem revisão: a extração de vagas e cursos só preenche o form
 - Novo ID de sessão e novo token CSRF a cada login/cadastro (evita fixação de sessão).
 - A cada requisição a conta é conferida no banco: se o administrador desativar/excluir o usuário ou mudar o
   tipo dele, a sessão aberta perde o acesso na hora.
-- Limite de tentativas de login (tabela `tentativas_login`): 5 senhas erradas para o mesmo e-mail (ou 30 do
-  mesmo IP) em 15 minutos bloqueiam por 15 minutos. Mensagem única e mesmo tempo de resposta, para não
-  revelar quais e-mails existem. Ajustes em `config/config.php`.
+- Limite de tentativas de login (tabela `tentativas_login`): 8 senhas erradas para o mesmo e-mail a partir do
+  mesmo IP (20 somando todos os IPs, ou 60 de um mesmo IP) em 5 minutos pausam o login por 5 minutos; a tela
+  avisa quando faltam 3. Mensagem única e mesmo tempo de resposta, para não revelar quais e-mails existem.
+  Tolerância a erros comuns (`UsuarioDAO::variantesSenha`): espaços nas pontas, primeira letra na caixa
+  trocada e Caps Lock ligado — no máximo 4 conferências, também feitas para e-mail inexistente (mesmo tempo
+  de resposta). No ambiente local (DEBUG) a tela diz o motivo exato (sem conta, senha incorreta, conta
+  desativada); em produção a mensagem continua única. Ajustes em `config/config.php`.
+- O hash da senha só é refeito se o algoritmo mudar (nunca por custo do bcrypt): refazer muda o hash, e a
+  sessão entende hash novo como "senha alterada", o que derrubaria as outras sessões abertas da conta.
+- `database/resetar_senhas.php` (só terminal) volta as contas de teste às senhas do README e libera o login.
 - Sair: aceita POST com token, link com token (`logout_url()`) ou o clique no menu do próprio site
   (cabeçalho `Sec-Fetch-Site`). Um link vindo de outro site mostra uma confirmação.
 
@@ -261,6 +403,23 @@ Nada é gravado sem revisão: a extração de vagas e cursos só preenche o form
   aleatório, entregues por `ArquivoController::imagem` (só tipos de imagem). Currículos: só por `download.php`,
   para o dono, o administrador, a empresa que recebeu a candidatura ou empresa Premium (perfil público).
 - Cabeçalhos: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`.
+- Empresa bloqueada: as vagas dela saem da área pública e deixam de receber candidaturas.
+- Candidatura cancelada: a empresa perde o acesso ao contato e ao currículo daquele candidato (LGPD).
+- **Exclusão da conta pelo candidato (LGPD)**: `PerfilController::excluirConta` (POST, CSRF) pede a senha — mesma
+  tolerância e mesma pausa contra tentativas do login (`UsuarioDAO::senhaConfere`) — e a caixa de confirmação.
+  Antes de apagar, `MaquinaAprendizado::esquecerDoUsuario` tira as lições de currículo dele do modelo; depois
+  `UsuarioDAO::excluir` apaga a conta (perfil, currículos, candidaturas, matches, assinaturas e pedidos de troca de
+  senha em cascata), os arquivos enviados e as tentativas de login do e-mail. As outras sessões abertas da conta
+  caem sozinhas (`revalidar_sessao`). Empresas pedem a exclusão ao administrador.
+- Log de troca de senha só no modo de demonstração (`DEBUG`), com o e-mail mascarado (`mascarar_email`).
+- **Jornadas** (`tests/jornadas.php`, também no gancho de commit): uma conta temporária percorre pelo HTTP
+  cadastro, saída/login, currículo DOCX, candidatura, extração de vagas e cursos, troca de senha e exclusão da
+  conta; tudo o que ela cria é apagado no fim, mesmo se um passo falhar.
+- Buscas com `LIKE` tratam `%` e `_` digitados como texto (`like()`); visualização de vaga conta 1 vez por visitante.
+
+**Doação (rodapé)**: com `DOACAO_PIX_CHAVE` preenchida em `config/config.php`, o rodapé mostra o QR Code Pix
+(`Pix::doacao()` monta o código; `assets/js/vendor/qrcode.js`, licença MIT, desenha o QR no navegador, sem internet)
+e o botão "Copiar código Pix". Nenhuma API externa é chamada.
 
 **Recuperação de senha (demonstrativa)**
 - Não há envio de e-mail. O link (válido por 30 minutos, uso único) é gravado em
@@ -289,7 +448,12 @@ usuarios 1──1 perfis 1──N curriculos
                   │                     └──N matches      N── perfis (candidato)
 usuarios 1──N assinaturas · tentativas_login · redefinicoes_senha
 categorias 1──N vagas / cursos
+usuarios 1──N aprendizado_exemplos · aprendizado_revisoes   (quem ensinou; aprendizado_palavras são os contadores)
 ```
+
+Categorias de vaga do seed: TI, Administração, Marketing, Vendas, RH, Financeiro, Engenharia, Saúde, Educação,
+Alimentação, Serviços Gerais e Limpeza, Logística e Transporte e Atendimento ao Público (as quatro últimas são as que a
+extração de vagas sugere). Uma categoria em uso não troca entre "Vagas" e "Cursos".
 
 Conexão (`app/Core/Database.php`): uma conexão por requisição, erros como exceção, prepared statements reais,
 timeout de 5 s, utf8mb4 e o fuso do MySQL igual ao do PHP (America/Sao_Paulo). Falhas viram

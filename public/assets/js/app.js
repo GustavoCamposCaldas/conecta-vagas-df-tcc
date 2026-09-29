@@ -1,20 +1,59 @@
 document.addEventListener('DOMContentLoaded',()=>{
   // Confirmação em ações destrutivas (painel).
   document.querySelectorAll('[data-confirm]').forEach(e=>e.addEventListener('click',ev=>{if(!confirm(e.dataset.confirm))ev.preventDefault()}));
-  setTimeout(()=>document.querySelectorAll('.alert').forEach(a=>a.style.opacity='.75'),5000);
+  // Só a mensagem "flash" (resultado da última ação) esmaece; avisos permanentes da tela continuam fortes.
+  setTimeout(()=>document.querySelectorAll('[data-flash]').forEach(a=>a.style.opacity='.75'),5000);
 
-  // Portal: botão "Copiar link" das matérias/reportagens.
+  // Botões "Copiar" (link das matérias, código Pix da doação). data-copiado = texto de confirmação.
   document.querySelectorAll('[data-copiar]').forEach(btn=>btn.addEventListener('click',async()=>{
-    const link=btn.dataset.copiar, rotulo=btn.querySelector('span');
+    const link=btn.dataset.copiar, rotulo=btn.querySelector('span'), original=rotulo?rotulo.textContent:'';
     let ok=false;
     try{ if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(link);ok=true;} }catch(e){}
     if(!ok){ // Fallback para http://localhost sem clipboard API
       const t=document.createElement('textarea');t.value=link;t.setAttribute('readonly','');t.style.position='fixed';t.style.opacity='0';
       document.body.appendChild(t);t.select();try{ok=document.execCommand('copy');}catch(e){}t.remove();
     }
-    if(!ok){window.prompt('Copie o link:',link);return;}
-    btn.classList.add('copiado'); if(rotulo) rotulo.textContent='Link copiado!';
-    setTimeout(()=>{btn.classList.remove('copiado'); if(rotulo) rotulo.textContent='Copiar link';},2500);
+    if(!ok){window.prompt('Copie:',link);return;}
+    btn.classList.add('copiado'); if(rotulo) rotulo.textContent=btn.dataset.copiado||'Link copiado!';
+    setTimeout(()=>{btn.classList.remove('copiado'); if(rotulo) rotulo.textContent=original;},2500);
+  }));
+
+  // QR Code Pix de doação (rodapé): desenhado em SVG a partir do código "copia e cola".
+  document.querySelectorAll('[data-qrcode]').forEach(el=>{
+    if(typeof qrcode!=='function') return;
+    try{ const q=qrcode(0,'M'); q.addData(el.dataset.qrcode); q.make(); el.innerHTML=q.createSvgTag({cellSize:4,margin:8,scalable:true}); }catch(e){}
+  });
+
+  // Carregador das máquinas de extração: AMARELO enquanto o envio/leitura está em andamento (o próximo resultado
+  // aparece AZUL, "Pronto"). Também impede o envio duplo: os botões ficam travados até a página responder.
+  const carregador=(form,texto)=>{
+    let c=form.querySelector('[data-carregador]');
+    if(!c){
+      c=document.createElement('div'); c.className='carregador'; c.dataset.carregador=''; c.setAttribute('role','status'); c.setAttribute('aria-live','polite');
+      c.innerHTML='<div class="carregador-trilho"><span class="carregador-barra"></span></div><span class="carregador-texto"></span>';
+      const acoes=form.querySelector('.form-actions'); if(acoes) acoes.before(c); else form.append(c);
+    }
+    c.hidden=false; c.className='carregador carregando indeterminado'; c.querySelector('.carregador-texto').textContent=texto;
+  };
+  document.querySelectorAll('form[data-carregando]').forEach(form=>form.addEventListener('submit',ev=>{
+    if(form.dataset.enviando){ ev.preventDefault(); return; }
+    form.dataset.enviando='1'; carregador(form,form.dataset.carregando);
+    setTimeout(()=>form.querySelectorAll('button').forEach(b=>b.disabled=true),0); // depois do envio: o botão clicado segue junto
+  }));
+  window.addEventListener('pageshow',ev=>{ if(!ev.persisted) return; // voltou pelo "voltar" do navegador: destrava
+    document.querySelectorAll('form[data-enviando]').forEach(form=>{ delete form.dataset.enviando; form.querySelectorAll('button').forEach(b=>b.disabled=false);
+      const c=form.querySelector('[data-carregador]'); if(c) c.hidden=true; });
+  });
+
+  // Máquina de extração: ao escolher o cartaz, mostra a prévia e já envia para leitura (sem clique extra).
+  // Com o leitor de cartaz da plataforma ativo (leitor-cartaz.js), quem lê e envia é ele.
+  document.querySelectorAll('[data-auto-envio]').forEach(inp=>inp.addEventListener('change',()=>{
+    const f=inp.files&&inp.files[0], form=inp.form; if(!f||!form||form.dataset.leitor) return;
+    const prev=form.querySelector('[data-previa]');
+    if(prev&&f.type.startsWith('image/')){ prev.src=URL.createObjectURL(f); prev.hidden=false; }
+    carregador(form,'Enviando o cartaz para leitura…');
+    const extrator=form.closest('.extrator')||form; extrator.querySelectorAll('button').forEach(b=>b.disabled=true);
+    form.submit();
   }));
 
   // Carrossel de fotos do topo da página inicial.
@@ -40,12 +79,38 @@ document.addEventListener('DOMContentLoaded',()=>{
     iniciar();
   });
 
-  // Painéis relâmpago da página inicial: um por vez, no canto da tela, de tempos em tempos.
-  // Pausam com o mouse/foco em cima; quem fecha não vê mais nesta sessão.
+  // Vitrine rotativa de vagas (página inicial): a cada intervalo, UM cartão esmaece e dá lugar à próxima vaga da fila;
+  // o que sai volta para o fim da fila — assim todas as vagas abertas passam pela vitrine, em rodízio sem fim.
+  // Pausa com o mouse/foco em cima, com a aba escondida ou no botão "Pausar"; parado para quem prefere menos movimento.
+  document.querySelectorAll('[data-rotativo]').forEach(grade=>{
+    const tpl=grade.parentElement.querySelector('template[data-rotativo-fila]'); if(!tpl) return;
+    const fila=[...tpl.content.children], botao=grade.parentElement.querySelector('[data-rotativo-pausa]');
+    const tempo=+grade.dataset.rotativo||4500, calmo=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let vaga=0, sobre=false, parado=calmo;
+    const trocar=()=>{
+      if(sobre||parado||document.hidden||!fila.length) return;
+      const cartoes=[...grade.children]; if(!cartoes.length) return;
+      const velho=cartoes[vaga%cartoes.length], novo=fila.shift().cloneNode(true);
+      vaga=(vaga+1)%cartoes.length;
+      velho.classList.add('cv-saindo');
+      setTimeout(()=>{ novo.classList.add('cv-entrando'); grade.replaceChild(novo,velho); fila.push(velho); velho.classList.remove('cv-saindo');
+        requestAnimationFrame(()=>requestAnimationFrame(()=>novo.classList.remove('cv-entrando'))); },450);
+    };
+    setInterval(trocar,tempo);
+    grade.addEventListener('mouseenter',()=>sobre=true); grade.addEventListener('mouseleave',()=>sobre=false);
+    grade.addEventListener('focusin',()=>sobre=true); grade.addEventListener('focusout',()=>sobre=false);
+    if(botao){
+      const rotulo=()=>{ botao.textContent=parado?'Continuar':'Pausar'; botao.setAttribute('aria-pressed',String(parado)); };
+      rotulo(); botao.addEventListener('click',()=>{ parado=!parado; rotulo(); });
+    }
+  });
+
+  // Painel relâmpago da página inicial: um balão de ideia que mostra uma mensagem por vez, em rodízio
+  // (quem somos, objetivo, missão, valores, Pix). Pausa com o mouse/foco em cima; quem fecha fica 3 minutos sem vê-lo.
   document.querySelectorAll('[data-relampago]').forEach(r=>{
     const paineis=[...r.querySelectorAll('.cv-relampago-painel')], barra=r.querySelector('.cv-relampago-barra i');
-    const CHAVE='cv-relampago-fechado', VISIVEL=9000, INTERVALO=14000, INICIO=3500;
-    try{ if(sessionStorage.getItem(CHAVE)) return; }catch(e){}
+    const CHAVE='cv-relampago-fechado', VISIVEL=9000, INTERVALO=7000, INICIO=4000, PAUSA_FECHADO=180000;
+    try{ const f=+sessionStorage.getItem(CHAVE); if(f && Date.now()-f<PAUSA_FECHADO) return; }catch(e){}
     if(!paineis.length) return;
     let n=0, timer=null, restante=VISIVEL, desde=0, aberto=false, pausado=false;
     const agendar=(fn,ms)=>{ clearTimeout(timer); timer=setTimeout(fn,ms); };
@@ -56,7 +121,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const correr=ms=>{ desde=Date.now(); restante=ms; if(barra){ barra.style.transition='none'; barra.style.width=(ms/VISIVEL*100)+'%'; void barra.offsetWidth; barra.style.transition='width '+ms+'ms linear'; barra.style.width='0%'; } agendar(esconder,ms); };
     const mostrar=()=>{
       paineis.forEach((p,k)=>p.hidden=k!==n);
-      r.hidden=false; void r.offsetWidth; r.classList.add('visivel'); aberto=true;
+      r.classList.remove('visivel'); r.hidden=false; void r.offsetWidth; r.classList.add('visivel'); aberto=true; // reinicia a animação de entrada
       if(!pausado) correr(VISIVEL);
     };
     const pausar=()=>{ if(!aberto||pausado) return; pausado=true; clearTimeout(timer); restante=Math.max(1500,restante-(Date.now()-desde)); if(barra){ barra.style.transition='none'; barra.style.width=(restante/VISIVEL*100)+'%'; } };
@@ -65,8 +130,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     r.addEventListener('focusin',pausar); r.addEventListener('focusout',retomar);
     r.querySelector('.cv-relampago-fechar').addEventListener('click',()=>{
       clearTimeout(timer); r.classList.remove('visivel'); setTimeout(()=>{ r.hidden=true; },300);
-      try{ sessionStorage.setItem(CHAVE,'1'); }catch(e){}
+      try{ sessionStorage.setItem(CHAVE,String(Date.now())); }catch(e){}
     });
+    const prox=r.querySelector('[data-relampago-prox]');
+    if(prox) prox.addEventListener('click',()=>{ const p=pausado; n=(n+1)%paineis.length; pausado=false; mostrar(); if(p) pausar(); });
+    // Clicar em "Ver como doar" leva ao rodapé e deixa o painel da doação parado na tela.
+    r.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',()=>pausar()));
     agendar(mostrar,INICIO);
   });
 

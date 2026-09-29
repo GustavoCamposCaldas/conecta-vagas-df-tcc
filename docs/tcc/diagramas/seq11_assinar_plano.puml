@@ -1,0 +1,19 @@
+@startuml
+!include estilo.iuml
+mainframe sd Assinar plano
+autonumber "0:"
+hide footbox
+
+actor Usuario as U
+boundary ":TelaPlanos" as T
+control ":PlanosController" as C
+entity ":AssinaturaDAO" as D
+U -> T ++ : clicar em "Assinar"
+T -> C ++ : index(acao = assinar)
+C -> D ++ : isCandidatoVip() / isEmpresaPremium()
+D --> C -- : false
+C -> D ++ : assinar(usuarioId, plano, valor, 30)
+D --> C -- : true
+C --> T -- : "Assinatura ativada por 30 dias."
+T --> U -- : exibir mensagem
+@enduml

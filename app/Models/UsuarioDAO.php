@@ -88,14 +88,45 @@ final class UsuarioDAO {
         return (bool)$s->fetchColumn();
     }
 
+    /** Lista as contas; perfil_id serve para o link "Ver portfólio" dos candidatos. */
     public function listar(?string $tipo = null, string $q = ''): array {
-        $sql = "SELECT * FROM usuarios WHERE 1=1"; $p = [];
-        if ($tipo && in_array($tipo, self::TIPOS, true)) { $sql .= " AND tipo=?"; $p[] = $tipo; }
-        if ($q !== '') { $sql .= " AND (nome LIKE ? OR email LIKE ?)"; $p[] = '%'.$q.'%'; $p[] = '%'.$q.'%'; }
-        $sql .= " ORDER BY created_at DESC, id DESC";
+        $sql = "SELECT u.*, p.id AS perfil_id FROM usuarios u LEFT JOIN perfis p ON p.usuario_id=u.id WHERE 1=1"; $p = [];
+        if ($tipo && in_array($tipo, self::TIPOS, true)) { $sql .= " AND u.tipo=?"; $p[] = $tipo; }
+        if ($q !== '') { $sql .= " AND (u.nome LIKE ? OR u.email LIKE ?)"; $p[] = like($q); $p[] = like($q); }
+        $sql .= " ORDER BY u.created_at DESC, u.id DESC";
         $s = Database::getConexao()->prepare($sql);
         $s->execute($p);
         return $s->fetchAll();
+    }
+
+    /**
+     * Ficha da conta para o "Ver" do painel: dados do usuário + perfil + números do que ela tem.
+     * null = usuário não existe.
+     */
+    public function resumo(int $id): ?array {
+        $s = Database::getConexao()->prepare(
+            "SELECT u.id, u.nome, u.email, u.tipo, u.telefone, u.ativo, u.ultimo_acesso, u.created_at,
+                    p.id AS perfil_id, p.nome_fantasia, p.titulo_profissional, p.cidade, p.uf, p.setor, p.publico,
+                    (SELECT COUNT(*) FROM vagas v WHERE v.perfil_empresa_id = p.id) AS total_vagas,
+                    (SELECT COUNT(*) FROM candidaturas c WHERE c.perfil_candidato_id = p.id) AS total_candidaturas,
+                    (SELECT COUNT(*) FROM curriculos cv WHERE cv.perfil_id = p.id) AS total_curriculos,
+                    (SELECT a.plano FROM assinaturas a WHERE a.usuario_id = u.id AND a.status = 'ativa' AND a.data_fim >= CURDATE() ORDER BY a.id DESC LIMIT 1) AS plano_ativo
+             FROM usuarios u LEFT JOIN perfis p ON p.usuario_id = u.id WHERE u.id = ?");
+        $s->execute([$id]);
+        return $s->fetch() ?: null;
+    }
+
+    /**
+     * Ativar/bloquear com um clique, com as mesmas travas do formulário: nunca o próprio
+     * administrador e nunca o último administrador ativo. '' = ok; senão, a mensagem de erro.
+     */
+    public function alterarAtivo(int $id, bool $ativo, int $meuId): string {
+        $alvo = $this->buscarPorId($id);
+        if (!$alvo) return 'Usuário não encontrado.';
+        if ($id === $meuId && !$ativo) return 'Você não pode bloquear a própria conta.';
+        if (!$ativo && $alvo['tipo'] === 'admin' && (int)$alvo['ativo'] && $this->contarAdminsAtivos() <= 1) return 'É preciso manter pelo menos um administrador ativo.';
+        Database::getConexao()->prepare("UPDATE usuarios SET ativo=? WHERE id=?")->execute([$ativo ? 1 : 0, $id]);
+        return '';
     }
 
     public function contarAdminsAtivos(): int {
@@ -114,19 +145,46 @@ final class UsuarioDAO {
         return $s->fetch() ?: null;
     }
 
+    /** Por que o último autenticar() falhou: 'sem_conta', 'desativada' ou 'senha' (a tela só detalha no ambiente local). */
+    public string $motivoFalha = '';
+
+    /**
+     * Variações aceitas da senha digitada (tolerância a erros comuns, como fazem os grandes sites):
+     * a própria senha, sem espaços nas pontas, com a 1ª letra na caixa trocada ("admin@123" → "Admin@123",
+     * celular que põe maiúscula sozinho) e com o Caps Lock ligado ("aDMIN@123"). Sempre no máximo 4.
+     * @return list<string>
+     */
+    public static function variantesSenha(string $senha): array {
+        $t = trim($senha);
+        $trocar = fn(string $c) => mb_strtoupper($c) === $c ? mb_strtolower($c) : mb_strtoupper($c);
+        $primeira = $t === '' ? '' : $trocar(mb_substr($t, 0, 1)).mb_substr($t, 1);
+        $capsLock = implode('', array_map($trocar, mb_str_split($t)));
+        return array_values(array_unique(array_filter([$senha, $t, $primeira, $capsLock], fn($v) => $v !== '')));
+    }
+
     public function autenticar(string $email, string $senha): array|false {
+        $this->motivoFalha = '';
         $u = $this->buscarPorEmail($email);
+        $variantes = self::variantesSenha($senha);
         if (!$u) {
             // Gasta o mesmo tempo de um login real: o tempo de resposta não revela quais e-mails existem.
-            password_verify($senha, '$2y$10$uiTuTWeHZjGisseAQFKgOOZrIqsMAT2p5wAY886sw.TAw7x5bae56');
+            foreach ($variantes as $v) password_verify($v, '$2y$10$uiTuTWeHZjGisseAQFKgOOZrIqsMAT2p5wAY886sw.TAw7x5bae56');
+            $this->motivoFalha = 'sem_conta';
             return false;
         }
-        if ((int)$u['ativo'] === 1 && password_verify($senha, $u['senha'])) {
+        $certa = null;
+        foreach ($variantes as $v) if (password_verify($v, $u['senha'])) { $certa = $v; break; }
+        $confere = $certa !== null;
+        if (!$confere) $this->motivoFalha = 'senha';
+        elseif ((int)$u['ativo'] !== 1) $this->motivoFalha = 'desativada';
+        if ((int)$u['ativo'] === 1 && $confere) {
             $db = Database::getConexao();
             $db->prepare("UPDATE usuarios SET ultimo_acesso=NOW() WHERE id=?")->execute([$u['id']]);
-            if (password_needs_rehash($u['senha'], PASSWORD_DEFAULT)) {
+            // Só refaz o hash se o ALGORITMO mudou (não por diferença de custo do bcrypt): refazer muda o hash,
+            // e a sessão entende hash novo como "senha alterada" — derrubaria as outras sessões abertas da conta.
+            if ((password_get_info($u['senha'])['algo'] ?? null) !== PASSWORD_DEFAULT) {
                 // Devolve o hash novo: é dele que a sessão tira a "marca" da senha (ver iniciar_sessao_usuario).
-                $u['senha'] = password_hash($senha, PASSWORD_DEFAULT);
+                $u['senha'] = password_hash($certa, PASSWORD_DEFAULT);
                 $db->prepare("UPDATE usuarios SET senha=? WHERE id=?")->execute([$u['senha'], $u['id']]);
             }
             return $u;
@@ -151,7 +209,7 @@ final class UsuarioDAO {
     public function minutosBloqueioLogin(string $ip, string $email, bool $somarIps = true): int {
         try {
             $db = Database::getConexao();
-            $janela = LOGIN_JANELA_MINUTOS;
+            $janela = max(1, (int)LOGIN_JANELA_MINUTOS);   // número inteiro: vai direto no SQL
             $s = $db->prepare("SELECT COUNT(*) n, MIN(created_at) primeira FROM tentativas_login WHERE ip=? AND email=? AND created_at > NOW() - INTERVAL $janela MINUTE");
             $s->execute([$ip, normalizar_email($email)]);
             $porEmail = $s->fetch();
@@ -170,6 +228,18 @@ final class UsuarioDAO {
             return max(1, (int)ceil(($libera - time()) / 60));
         } catch (Throwable) {
             return 0; // tabela ausente (banco antigo): não impede o login
+        }
+    }
+
+    /** Quantos erros ainda cabem para este IP + e-mail antes da pausa (para avisar na tela). */
+    public function tentativasRestantes(string $ip, string $email): int {
+        try {
+            $janela = max(1, (int)LOGIN_JANELA_MINUTOS);
+            $s = Database::getConexao()->prepare("SELECT COUNT(*) FROM tentativas_login WHERE ip=? AND email=? AND created_at > NOW() - INTERVAL $janela MINUTE");
+            $s->execute([$ip, normalizar_email($email)]);
+            return max(0, LOGIN_MAX_TENTATIVAS - (int)$s->fetchColumn());
+        } catch (Throwable) {
+            return LOGIN_MAX_TENTATIVAS;
         }
     }
 
@@ -252,13 +322,23 @@ final class UsuarioDAO {
         }
     }
 
+    /** A senha digitada é a desta conta? Mesma tolerância do login (espaços nas pontas, 1ª letra trocada, Caps Lock). */
+    public function senhaConfere(int $id, string $senha): bool {
+        $u = $this->buscarPorId($id);
+        if (!$u || $senha === '') return false;
+        foreach (self::variantesSenha($senha) as $v) if (password_verify($v, (string)$u['senha'])) return true;
+        return false;
+    }
+
     /**
-     * Exclui a conta; perfil, currículos, candidaturas, vagas, matches e assinaturas saem em cascata (FKs).
-     * Remove também os arquivos enviados (currículos, foto/logo e imagens de vagas enviadas).
+     * Exclui a conta; perfil, currículos, candidaturas, vagas, matches, assinaturas e pedidos de troca de senha
+     * saem em cascata (FKs). Remove também os arquivos enviados (currículos, foto/logo e imagens de vagas enviadas)
+     * e as tentativas de login guardadas pelo e-mail (LGPD: nada da pessoa fica para trás).
      */
     public function excluir(int $id): bool {
         try {
             $db = Database::getConexao();
+            $email = (string)($this->buscarPorId($id)['email'] ?? '');
             $s = $db->prepare("SELECT cv.arquivo_pdf FROM curriculos cv JOIN perfis p ON p.id=cv.perfil_id WHERE p.usuario_id=?
                                UNION SELECT foto FROM perfis WHERE usuario_id=? AND foto IS NOT NULL
                                UNION SELECT v.imagem FROM vagas v JOIN perfis p ON p.id=v.perfil_empresa_id WHERE p.usuario_id=? AND v.imagem LIKE 'assets/uploads/%'");
@@ -268,6 +348,7 @@ final class UsuarioDAO {
             $d->execute([$id]);
             if ($d->rowCount() < 1) return false;
             foreach ($arquivos as $a) apagar_upload_sem_uso((string)$a);
+            if ($email !== '') $db->prepare("DELETE FROM tentativas_login WHERE email=?")->execute([$email]);
             return true;
         } catch (Throwable) {
             return false;

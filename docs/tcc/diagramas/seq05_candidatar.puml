@@ -1,0 +1,24 @@
+@startuml
+!include estilo.iuml
+mainframe sd Candidatar-se à vaga
+autonumber "0:"
+hide footbox
+
+actor Candidato as A
+boundary ":TelaVaga" as T
+control ":CandidaturaController" as C
+entity ":AssinaturaDAO" as S
+entity ":CandidaturaDAO" as D
+A -> T ++ : clicar em "Candidatar-se"
+T -> C ++ : candidatar(vagaId)
+C -> S ++ : podeCandidatar(usuarioId, perfilId)
+S --> C -- : permitido / limite
+C --> T -- : formulário (currículo + carta)
+T --> A -- : exibir formulário
+A -> T ++ : escolher currículo e enviar
+T -> C ++ : candidatar(vagaId, curriculoId, carta)
+C -> D ++ : enviarComLimite(perfil, vaga, cv, carta, limite)
+D --> C -- : "ok"
+C --> T -- : "Candidatura enviada com sucesso!"
+T --> A -- : exibir mensagem
+@enduml

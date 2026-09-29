@@ -8,4 +8,5 @@
 <h3>2. Currículo e extração</h3><p>O arquivo enviado poderá ser processado automaticamente para extrair informações e sugerir o preenchimento do perfil. O usuário pode revisar e editar os dados.</p>
 <h3>3. Divulgação</h3><p>Quando o perfil estiver público, informações profissionais poderão ser exibidas a empresas cadastradas, conforme as configurações da plataforma.</p>
 <h3>4. Controle do usuário</h3><p>O usuário pode atualizar seus dados e retirar o perfil da exibição pública pelo próprio perfil.</p>
+<p>O candidato pode excluir a conta a qualquer momento em <b>Meu perfil → Seus dados → Excluir minha conta</b>: o perfil, os currículos (arquivos), a foto, as candidaturas e o match são apagados da plataforma. Empresas pedem a exclusão ao administrador.</p>
 <p class="muted small">Este texto é parte acadêmica/demonstrativa do projeto e não substitui orientação jurídica específica.</p></div>

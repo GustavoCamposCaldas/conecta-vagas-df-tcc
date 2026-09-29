@@ -1,0 +1,17 @@
+@startuml
+!include estilo.iuml
+mainframe sd Cancelar candidatura
+autonumber "0:"
+hide footbox
+
+actor Candidato as A
+boundary ":TelaPerfil" as T
+control ":CandidaturaController" as C
+entity ":CandidaturaDAO" as D
+A -> T ++ : clicar em "Cancelar"
+T -> C ++ : cancelar(id)
+C -> D ++ : cancelarDoCandidato(id, perfilId)
+D --> C -- : true
+C --> T -- : "Candidatura cancelada."
+T --> A -- : exibir mensagem
+@enduml

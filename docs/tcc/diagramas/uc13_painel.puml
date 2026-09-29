@@ -1,0 +1,12 @@
+@startuml
+!include estilo.iuml
+mainframe uc Visualizar painel
+left to right direction
+actor Empresa as E
+rectangle "Conecta Vagas DF" {
+  usecase "Visualizar painel\ncom indicadores e gráficos" as P
+}
+actor Administrador as A
+E -- P
+P -- A
+@enduml

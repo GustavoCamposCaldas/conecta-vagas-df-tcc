@@ -12,7 +12,11 @@ final class AuthController extends Controller {
      * somando vários IPs) ou do mesmo IP bloqueiam por alguns minutos (limites em config/config.php).
      */
     public function login(): void {
-        if (usuarioLogado()) redirect(destinoPainel());
+        // Volta para onde a pessoa estava (ex.: "Entrar para assinar" nos planos). Só destinos da lista:
+        // nunca um endereço vindo do usuário (evita redirecionamento para outro site).
+        $voltas = ['planos' => 'planos.php'];
+        $voltar = $voltas[post_str('voltar', get_str('voltar'))] ?? null;
+        if (usuarioLogado()) redirect($voltar ?? destinoPainel());
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $title = 'Entrar';
             $this->view('auth/login', get_defined_vars());
@@ -27,21 +31,31 @@ final class AuthController extends Controller {
 
         $minutos = $dao->minutosBloqueioLogin($ip, $email);
         if ($minutos > 0) {
-            flash('erro', "Muitas tentativas de login sem sucesso. Por segurança, aguarde {$minutos} minuto(s) e tente novamente, ou use \"Esqueci minha senha\".");
+            flash('erro', "Muitas tentativas de login sem sucesso. Por segurança, aguarde {$minutos} minuto(s) e tente novamente, ou use \"Esqueci minha senha\". Dica: o botão do olho, ao lado da senha, mostra o que foi digitado.");
             redirect('login.php');
         }
 
         $u = ($email !== '' && $senha !== '') ? $dao->autenticar($email, $senha) : false;
         if (!$u) {
             $dao->registrarFalhaLogin($ip, $email);
-            // Mensagem única: não revela se o e-mail existe.
-            flash('erro', 'E-mail ou senha inválidos ou conta desativada.');
-            redirect('login.php');
+            // Mensagem única: não revela se o e-mail existe. Avisa quando está perto da pausa de segurança.
+            // No ambiente local (DEBUG, acesso pelo próprio computador) diz o motivo exato, para facilitar os testes.
+            $restam = $dao->tentativasRestantes($ip, $email);
+            $motivo = DEBUG ? match ($dao->motivoFalha) {
+                'sem_conta' => 'Não existe conta com o e-mail '.$email.'. Crie a conta em "Criar conta" ou use uma das contas de teste.',
+                'desativada' => 'Esta conta está desativada. Um administrador pode reativá-la em Painel → Usuários.',
+                'senha' => 'Senha incorreta para '.$email.'.',
+                default => 'E-mail ou senha inválidos ou conta desativada.',
+            }.' (Detalhe mostrado só no ambiente local.)' : 'E-mail ou senha inválidos ou conta desativada.';
+            flash('erro', $motivo.($restam <= 3
+                ? ' '.($restam === 0 ? 'Login pausado por '.LOGIN_JANELA_MINUTOS.' minutos por segurança.' : 'Restam '.$restam.' '.($restam === 1 ? 'tentativa' : 'tentativas').' antes de uma pausa de '.LOGIN_JANELA_MINUTOS.' minutos.').' Use o olho ao lado da senha para conferir o que foi digitado, ou "Esqueci minha senha".'
+                : ''));
+            redirect('login.php'.($voltar ? '?voltar=planos' : ''));
         }
 
         $dao->limparFalhasLogin($ip, $email);
         iniciar_sessao_usuario($u); // novo ID de sessão (evita fixação de sessão) e novo token CSRF
-        redirect(destinoPainel());
+        redirect($voltar ?? destinoPainel());
     }
 
     /**

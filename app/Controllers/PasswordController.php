@@ -4,10 +4,10 @@ declare(strict_types=1);
 /**
  * Recuperação de senha — VERSÃO DEMONSTRATIVA (ambiente local do TCC).
  *
- * Não há envio de e-mail real. O link gerado é:
- *  - gravado em storage/logs/redefinicoes_senha.log (pasta bloqueada para o navegador);
- *  - mostrado na tela SOMENTE com DEBUG=true e acesso pelo próprio computador (localhost).
- * Em produção, o link seria enviado por e-mail e nunca exibido na tela.
+ * Não há envio de e-mail real. No modo de demonstração (DEBUG), o link gerado é:
+ *  - gravado em storage/logs/redefinicoes_senha.log, com o e-mail mascarado (pasta bloqueada para o navegador);
+ *  - mostrado na tela quando o acesso é pelo próprio computador (localhost).
+ * Sem DEBUG (produção), o link não vai para log nem para a tela: seria enviado por e-mail.
  *
  * O banco guarda só o hash SHA-256 do token; o link vale 30 minutos e pode ser usado uma vez.
  */
@@ -35,10 +35,12 @@ final class PasswordController extends Controller {
                 redirect('esqueci_senha.php');
             }
             $token = $dao->criarTokenRedefinicao($email, ip_cliente());
-            if ($token !== null) {
+            if ($token !== null && DEBUG) {
+                // Só no modo de demonstração: sem e-mail configurado, o log é quem entrega o link. Fora dele, nada vai
+                // para o log — o link funciona como uma senha provisória e o e-mail é dado pessoal (LGPD).
                 $link = url('redefinir_senha.php?token='.$token);
-                registrar_log('redefinicoes_senha.log', "Link de redefinição para {$email} (válido por ".UsuarioDAO::REDEFINICAO_MINUTOS." min): {$link}");
-                if (DEBUG && $localhost) $linkDemo = $link;
+                registrar_log('redefinicoes_senha.log', 'Link de redefinição para '.mascarar_email($email).' (válido por '.UsuarioDAO::REDEFINICAO_MINUTOS." min): {$link}");
+                if ($localhost) $linkDemo = $link;
             }
             // Mesma resposta exista ou não o e-mail (não revela quem tem conta).
             $enviado = true;

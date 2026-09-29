@@ -6,6 +6,8 @@ declare(strict_types=1);
  * candidaturas recebidas, banco de talentos e dados da empresa.
  */
 final class EmpresaController extends Controller {
+    use AprendeComRevisao;
+
     /**
      * admin/pages/vagas.php — CRUD de vagas + MÁQUINA DE EXTRAÇÃO DE VAGAS:
      *  - "Ler cartaz": envia a imagem do anúncio; o OCR lê o texto e o formulário é preenchido
@@ -13,7 +15,8 @@ final class EmpresaController extends Controller {
      *  - "Colar texto": o mesmo a partir do texto do anúncio (WhatsApp, Instagram, site).
      * Nada é salvo sem revisão. Empresa só mexe nas próprias vagas; o limite do plano básico
      * (2 vagas abertas) vale ao publicar e ao reativar; o mesmo anúncio não é publicado duas vezes.
-     * Ao salvar, o match é recalculado.
+     * Ao salvar, o match é recalculado e, se o formulário veio da extração, a MÁQUINA DE APRENDIZADO
+     * compara a sugestão com o que foi salvo e aprende com a correção (trait AprendeComRevisao).
      */
     public function vagas(): void {
         exigirLogin();
@@ -45,7 +48,35 @@ final class EmpresaController extends Controller {
             if ($acao === 'excluir') {
                 $ok = $vagaPermitida($id) && $dao->excluir($id);
                 flash($ok ? 'ok' : 'erro', $ok ? 'Vaga excluída (candidaturas e matches dela também).' : 'Vaga não encontrada ou sem permissão.');
-                redirect('admin/pages/vagas.php');
+                redirect('admin/pages/vagas.php'.painel_qs());
+            }
+
+            // Ativar / pausar / encerrar com um clique. Reativar respeita o limite do plano básico.
+            if (in_array($acao, ['ativar', 'pausar', 'encerrar'], true)) {
+                $v = $vagaPermitida($id);
+                if (!$v) negar_acesso('Vaga não encontrada ou sem permissão.');
+                $novo = ['ativar' => 'ativa', 'pausar' => 'pausada', 'encerrar' => 'encerrada'][$acao];
+                $limite = null;
+                if ($novo === 'ativa' && !isAdmin() && !$dao->estaAberta($v)) {
+                    $perm = $assinaturaDao->podePublicarVaga($usuarioId, (int)$v['perfil_empresa_id']);
+                    if (!$perm['permitido']) { flash('erro', $perm['motivo']); redirect('planos.php'); }
+                    if (isset($perm['limite'])) $limite = (int)$perm['limite'];
+                }
+                $res = $dao->alterarStatus($id, $novo, $limite);
+                if ($res === 'limite') { flash('erro', "Sua empresa atingiu o limite de {$limite} vagas ativas do Plano Básico Gratuito. Assine o Plano Empresa Premium para publicar vagas ilimitadas!"); redirect('planos.php'); }
+                if ($res === 'ok') {
+                    $msg = ['ativa' => 'Vaga ativada.', 'pausada' => 'Vaga pausada: saiu da busca, mas continua salva.', 'encerrada' => 'Vaga encerrada.'][$novo];
+                    if ($novo === 'ativa') {
+                        $n = 0;
+                        try { $n = (new MatchService())->recalcularVaga($id); } catch (Throwable) {}
+                        $msg .= " Match calculado com {$n} candidato(s).";
+                        if (!empty($v['data_expiracao']) && $v['data_expiracao'] < date('Y-m-d')) $msg .= ' Atenção: a data "Inscrições até" já passou — edite a vaga e renove a data para ela voltar à busca.';
+                    }
+                    flash('ok', $msg);
+                } else {
+                    flash('erro', 'Não foi possível alterar o status da vaga.');
+                }
+                redirect('admin/pages/vagas.php'.painel_qs());
             }
 
             $existente = $id ? $vagaPermitida($id) : null;
@@ -55,23 +86,38 @@ final class EmpresaController extends Controller {
                 // Extração de vagas: preenche o formulário (sem salvar) com o texto do anúncio ou com
                 // a leitura do CARTAZ enviado como imagem (OCR). O cartaz vira a imagem da vaga.
                 $imagemForm = $existente['imagem'] ?? 'assets/img/vagas/vaga1.jpg';
+                // "Extrair de novo" com o texto do cartaz corrigido: o cartaz lido continua sendo a imagem.
+                $imagemAtual = $this->imagemDoFormulario(mb_substr(post_str('imagem_atual'), 0, 255), $existente);
+                if ($imagemAtual !== '') $imagemForm = $imagemAtual;
                 if ($acao === 'ler_cartaz') {
                     $cartaz = salvar_imagem_enviada('cartaz', 'cartaz', 8 * 1024 * 1024);
                     if (!$cartaz) {
                         flash('erro', $cartaz === null ? 'Selecione a imagem do cartaz.' : 'Cartaz inválido: envie JPG, PNG ou WEBP de até 8 MB.');
-                        redirect('admin/pages/vagas.php'.($id ? '?edit='.$id : ''));
+                        redirect('admin/pages/vagas.php'.painel_qs($id ? ['edit' => $id] : []));
                     }
                     $this->descartarCartazesLidos();
                     $_SESSION['cartazes_lidos'] = [$cartaz];
-                    $extraido = ExtracaoVaga::doImagem((string)caminho_upload($cartaz));
+                    // Leituras feitas no navegador pelo leitor da plataforma; sem elas, o Tesseract do servidor (se houver).
+                    $extraido = ExtracaoVaga::doImagem((string)caminho_upload($cartaz), OcrImagem::leiturasDoNavegador($_POST['ocr_tsv'] ?? null));
                     $imagemForm = $cartaz;
                 } else {
+                    // Caixa vazia (ex.: clicou em "Extrair" enquanto o cartaz ainda era lido): volta sem relatório em branco.
+                    if (post_str('texto_anuncio') === '') {
+                        flash('erro', 'Cole o texto do anúncio (ou envie o cartaz) antes de extrair.');
+                        redirect('admin/pages/vagas.php'.painel_qs($id ? ['edit' => $id] : []));
+                    }
                     $extraido = ExtracaoVaga::doTexto(post_str('texto_anuncio'));
                 }
                 $cat = $extraido['categoria'] ? $catDao->buscarPorNome($extraido['categoria'], 'vaga') : null;
+                if ($cat && !(int)$cat['ativo']) $cat = null; // categoria desativada não é aplicada
+                $relatorioVaga = ExtracaoVaga::relatorio($extraido, $cat['nome'] ?? '');
+                // O texto lido fica na caixa "colar texto": corrige-se um erro do OCR e extrai de novo.
+                $textoAnuncio = $acao === 'ler_cartaz' ? (string)($extraido['texto_ocr'] ?? '') : post_str('texto_anuncio');
                 $parecida = $extraido['titulo'] !== '' ? $dao->buscarParecida($extraido['titulo'], $extraido['anunciante'], $extraido['cidade'], $id) : null;
                 $form = $extraido + ['id' => $id, 'categoria_id' => $cat['id'] ?? null, 'perfil_empresa_id' => $existente['perfil_empresa_id'] ?? post_int('perfil_empresa_id'),
                                      'imagem' => $imagemForm, 'status' => $existente['status'] ?? 'ativa', 'destaque' => $existente['destaque'] ?? 0, 'data_expiracao' => $existente['data_expiracao'] ?? null];
+                // A sugestão fica guardada até o "Salvar": aí a máquina vê o que a pessoa corrigiu e aprende.
+                $form['sugestao_maquina'] = $this->guardarSugestao('vaga', fn() => MaquinaAprendizado::sugestao('vaga', $extraido, $extraido['linhas'] ?? [], $textoAnuncio));
             } else {
                 $pid = isAdmin() ? post_int('perfil_empresa_id') : (int)($perfil['id'] ?? 0);
                 $d = [
@@ -130,7 +176,7 @@ final class EmpresaController extends Controller {
                     // escolhida antes (o cartaz lido continua no formulário e não é descartado).
                     if ($img) { apagar_upload_sem_uso($img); $d['imagem'] = $imagemEscolhida; $erros[] = 'Selecione a imagem de novo ao corrigir.'; }
                     flash('erro', implode(' ', $erros));
-                    $form = $d + ['id' => $id];
+                    $form = $d + ['id' => $id, 'sugestao_maquina' => post_str('sugestao_maquina')]; // a revisão continua valendo para o aprendizado
                 } else {
                     // Contagem do limite e gravação na mesma transação (evita passar do limite com envios simultâneos).
                     $res = $dao->salvarComLimite($d, $id, $limite);
@@ -146,23 +192,46 @@ final class EmpresaController extends Controller {
                         $this->descartarCartazesLidos(); // o cartaz usado agora pertence à vaga; outros lidos e não usados saem
                         $n = 0;
                         try { $n = (new MatchService())->recalcularVaga((int)$novoId); } catch (Throwable) {}
-                        flash('ok', ($id ? 'Vaga atualizada.' : 'Vaga publicada!').($d['status'] === 'ativa' ? " Match calculado com {$n} candidato(s)." : ''));
+                        // Aprendizado: a vaga salva é a resposta certa para a sugestão da extração.
+                        $categoriaNome = array_column($cats, 'nome', 'id')[(int)$d['categoria_id']] ?? '';
+                        $aprendeu = $this->aprenderComRevisao('vaga', $d + ['categoria' => $categoriaNome], post_str('sugestao_maquina'));
+                        flash('ok', ($id ? 'Vaga atualizada.' : 'Vaga publicada!').($d['status'] === 'ativa' ? " Match calculado com {$n} candidato(s)." : '')
+                            .(!empty($aprendeu['licoes']) ? ' A máquina de extração aprendeu '.$aprendeu['licoes'].' '.($aprendeu['licoes'] === 1 ? 'lição' : 'lições').' com a sua revisão.' : ''));
                     } else {
                         flash('erro', 'Não foi possível salvar a vaga.');
                     }
-                    redirect('admin/pages/vagas.php');
+                    redirect('admin/pages/vagas.php'.painel_qs());   // volta para a mesma lista (filtros e ordem)
                 }
             }
         }
 
-        $edit = get_str('edit') !== '' ? $vagaPermitida((int)get_str('edit')) : null;
+        $edit = registro_encontrado(get_str('edit') !== '' ? $vagaPermitida((int)get_str('edit')) : null, 'edit', 'admin/pages/vagas.php', 'Vaga não encontrada (pode ter sido excluída ou ser de outra empresa).');
         if (get_str('edit') !== '' && !$edit) negar_acesso('Vaga não encontrada ou sem permissão.');
         $parecida ??= null;
+        $relatorioVaga ??= null;
+        $textoAnuncio ??= post_str('texto_anuncio');
         $ocrDisponivel = OcrImagem::disponivel();
         $form ??= $edit ?? ['id' => 0, 'perfil_empresa_id' => 0, 'categoria_id' => null, 'titulo' => '', 'anunciante' => '', 'descricao' => '', 'requisitos' => '', 'beneficios' => '', 'contato' => '', 'tipo_vaga' => 'clt',
             'nivel_experiencia' => 'junior', 'remoto' => 'presencial', 'cidade' => 'Brasília', 'uf' => 'DF', 'salario_minimo' => null, 'salario_maximo' => null,
             'imagem' => 'assets/img/vagas/vaga1.jpg', 'status' => 'ativa', 'destaque' => 0, 'data_expiracao' => null];
-        $lista = isAdmin() ? $dao->listar(false) : ($perfil ? $dao->listarPorEmpresa((int)$perfil['id']) : []);
+        $todas = isAdmin() ? $dao->listar(false) : ($perfil ? $dao->listarPorEmpresa((int)$perfil['id']) : []);
+        // Filtros da lista: situação (aberta, pausada, encerrada, expirada) e busca por título/empresa/cidade.
+        $situacao = fn(array $x) => $x['status'] === 'ativa' && !empty($x['data_expiracao']) && $x['data_expiracao'] < date('Y-m-d') ? 'expirada' : $x['status'];
+        $porSituacao = array_count_values(array_map($situacao, $todas));
+        $filtroStatus = enum_val(get_str('status'), [...VagaDAO::STATUS, 'expirada'], '');
+        $busca = get_str('q');
+        $buscaN = Competencias::normalizar($busca);
+        $filtroEmpresa = isAdmin() ? (int)get_str('empresa') : 0;   // administrador: vagas de uma conta de empresa
+        $lista = array_values(array_filter($todas, fn($x) => ($filtroStatus === '' || $situacao($x) === $filtroStatus)
+            && (!$filtroEmpresa || (int)$x['perfil_empresa_id'] === $filtroEmpresa)
+            && ($buscaN === '' || str_contains(Competencias::normalizar(($x['titulo'] ?? '').' '.($x['empresa_nome'] ?? '').' '.($x['publicado_por'] ?? '').' '.($x['cidade'] ?? '')), $buscaN))));
+        // Ordenação por coluna (padrão: destaque e mais recentes, como vem do banco) e paginação.
+        foreach ($lista as &$x) $x['situacao'] = $situacao($x);
+        unset($x);
+        [$ordem, $dir] = lista_ordem(['padrao', 'titulo', 'empresa_nome', 'situacao', 'total_candidaturas', 'visualizacoes', 'created_at'], 'padrao', 'asc');
+        if ($ordem !== 'padrao') $lista = ordenar_linhas($lista, $ordem, $dir);
+        $totalLista = count($lista);
+        [$lista, $pagina, $paginas] = paginar($lista, 25);
         $imagens = imagens_da_pasta('assets/img/vagas');
         $dinheiro = fn($v) => $v !== null && $v !== '' ? number_format((float)$v, 2, ',', '.') : '';
 
@@ -196,8 +265,7 @@ final class EmpresaController extends Controller {
                 $ok = $status !== '' && (isAdmin() ? $dao->atualizarStatus($id, $status, $obs) : ($perfil && $dao->atualizarStatusPorEmpresa($id, (int)$perfil['id'], $status, $obs)));
                 flash($ok ? 'ok' : 'erro', $ok ? 'Candidatura atualizada. O candidato vê o novo status e o retorno no perfil dele.' : 'Não foi possível atualizar (candidatura inexistente, de outra empresa ou cancelada pelo candidato).');
             }
-            $volta = array_filter(['vaga_id' => post_int('vaga_id') ?: null, 'status' => enum_val(post_str('filtro_status'), CandidaturaDAO::STATUS, '') ?: null]);
-            redirect('admin/pages/candidaturas.php'.($volta ? '?'.http_build_query($volta) : ''));
+            redirect('admin/pages/candidaturas.php'.painel_qs());   // mesma lista: filtros, ordem e página
         }
 
         $vagaId = (int)get_str('vaga_id');
@@ -205,6 +273,18 @@ final class EmpresaController extends Controller {
         $statusPermitidos = isAdmin() ? CandidaturaDAO::STATUS : CandidaturaDAO::STATUS_EMPRESA;
         $lista = isAdmin() ? $dao->listarTodas($vagaId, $status) : ($perfil ? $dao->listarPorEmpresa((int)$perfil['id'], $vagaId, $status) : []);
         $vagasFiltro = isAdmin() ? (new VagaDAO())->listar(false) : ($perfil ? (new VagaDAO())->listarPorEmpresa((int)$perfil['id']) : []);
+        // Ordenação: padrão = VIP primeiro e maior match (como vem do banco); ou match, data ou nome.
+        $ordensCand = ['relevancia' => 'Relevância (VIP e match)', 'match' => 'Maior match', 'recentes' => 'Mais recentes', 'antigas' => 'Mais antigas', 'nome' => 'Nome do candidato (A–Z)'];
+        $ordem = enum_val(get_str('ordem'), array_keys($ordensCand), 'relevancia');
+        $lista = match ($ordem) {
+            'match' => ordenar_linhas($lista, 'match_pontuacao', 'desc'),
+            'recentes' => ordenar_linhas($lista, 'data_candidatura', 'desc'),
+            'antigas' => ordenar_linhas($lista, 'data_candidatura', 'asc'),
+            'nome' => ordenar_linhas($lista, 'candidato_nome', 'asc'),
+            default => $lista,
+        };
+        $totalLista = count($lista);
+        [$lista, $pagina, $paginas] = paginar($lista, 20);
 
         $title = 'Candidaturas';
         $abaAtiva = 'candidaturas';
@@ -235,6 +315,13 @@ final class EmpresaController extends Controller {
             ])), $busca)));
         }
 
+        // Ordenação (o nome só entra na ordem para quem vê o nome: plano Premium) e paginação.
+        $ordensTal = ['relevancia' => 'VIP e mais recentes', 'cargo' => 'Cargo (A–Z)', 'cidade' => 'Cidade (A–Z)'] + ($isPremium ? ['nome' => 'Nome (A–Z)'] : []);
+        $ordem = enum_val(get_str('ordem'), array_keys($ordensTal), 'relevancia');
+        if ($ordem !== 'relevancia') $talentos = ordenar_linhas($talentos, ['cargo' => 'titulo_profissional', 'cidade' => 'cidade', 'nome' => 'nome'][$ordem], 'asc');
+        $totalTalentos = count($talentos);
+        [$talentos, $pagina, $paginas] = paginar($talentos, 24);
+
         $title = 'Banco de Talentos';
         $abaAtiva = 'talentos';
         $this->view('admin/talentos', get_defined_vars());
@@ -261,7 +348,7 @@ final class EmpresaController extends Controller {
             if ($erros) { flash('erro', implode(' ', $erros)); redirect('admin/pages/empresa_perfil.php'); }
             if ($cnpj !== '') $d['cnpj'] = vsprintf('%s.%s.%s/%s-%s', [substr($cnpj, 0, 2), substr($cnpj, 2, 3), substr($cnpj, 5, 3), substr($cnpj, 8, 4), substr($cnpj, 12, 2)]);
             $logo = salvar_imagem_enviada('logo', 'logo');
-            if ($logo === false) { flash('erro', 'Logo inválida (JPG, PNG ou WEBP até 3 MB).'); redirect('admin/pages/empresa_perfil.php'); }
+            if ($logo === false) { flash('erro', 'Logo inválida: use JPG, PNG ou WEBP de até 3 MB.'); redirect('admin/pages/empresa_perfil.php'); }
             if ($logo) $d['foto'] = $logo;
             $d['publico'] = 1; $d['aceite_lgpd'] = 1;
             $ok = $dao->salvar(new PerfilDTO($d));

@@ -1,0 +1,27 @@
+@startuml
+!include estilo.iuml
+mainframe sd Alterar vaga
+autonumber "0:"
+hide footbox
+
+actor Empresa as E
+boundary ":TelaVagas" as T
+control ":EmpresaController" as C
+entity ":VagaDAO" as D
+control ":MatchService" as M
+E -> T ++ : clicar em "Editar"
+T -> C ++ : vagas(edit = id)
+C -> D ++ : buscar(id)
+D --> C -- : dados da vaga
+C --> T -- : formulário preenchido
+T --> E -- : exibir formulário
+E -> T ++ : alterar e salvar
+T -> C ++ : vagas(acao = salvar, id, dados)
+C -> C : conferir dona da vaga
+C -> D ++ : salvarComLimite(dados, id, limite)
+D --> C -- : id
+C -> M ++ : recalcularVaga(id)
+M --> C -- : ok
+C --> T -- : "Vaga atualizada."
+T --> E -- : exibir mensagem
+@enduml

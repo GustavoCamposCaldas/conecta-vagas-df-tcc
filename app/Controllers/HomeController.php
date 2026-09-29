@@ -11,7 +11,7 @@ final class HomeController extends Controller {
      *  2. quem somos;
      *  3. vagas de emprego (cartões no formato de notícia curta);
      *  4. assinaturas (faixa no meio da página);
-     *  5. cursos e e-books (mesmo cartão das vagas).
+     *  5. cursos, e-books e vídeos — cada formato na sua seção, com o mesmo cartão e a mesma vitrine rotativa das vagas.
      */
     public function index(): void {
         $vagas = []; $cursos = []; $dbErro = null;
@@ -33,8 +33,19 @@ final class HomeController extends Controller {
                 }
             } catch (Throwable) {}
         }
+        // Vitrine rotativa: 5 cartões na tela; as demais vagas abertas ficam na fila e vão entrando uma a uma (app.js).
         $vagasCapa = array_slice($vagas, 0, 5);
-        $cursosCapa = array_slice($cursos, 0, 5);
+        $vagasFila = array_slice($vagas, 5);
+        $totalVagas = count($vagas);
+        // Conteúdos separados por formato (cursos, e-books, vídeos), cada um com a MESMA vitrine rotativa das vagas:
+        // 5 cartões na tela (os mais novos) e os demais na fila, entrando um a um.
+        $conteudosCapa = []; $conteudosFila = []; $totalConteudos = [];
+        foreach (CursoDAO::TIPOS as $t) {
+            $doFormato = array_values(array_filter($cursos, fn($c) => $c['tipo'] === $t));
+            $conteudosCapa[$t] = array_slice($doFormato, 0, 5);
+            $conteudosFila[$t] = array_slice($doFormato, 5);
+            $totalConteudos[$t] = count($doFormato);
+        }
 
         // Carrossel: todas as imagens da pasta public/assets/img/brasilia/ (basta trocar os arquivos).
         // Créditos das fotos de teste (Wikimedia Commons, licenças livres).
@@ -44,7 +55,7 @@ final class HomeController extends Controller {
             'brasilia4.jpg' => ['Ponte JK — Marinelson Almeida', 'CC BY 2.0', 'https://commons.wikimedia.org/wiki/File:Ponte_JK_-_Lago_Parano%C3%A1_-_Brasilia._(15352509527).jpg'],
             'brasilia5.jpg' => ['Esplanada à noite — Dasfour2022', 'CC BY-SA 4.0', 'https://commons.wikimedia.org/wiki/File:Esplanada_dos_Ministerios_a_noite.jpg'],
         ];
-        $slides = imagens_da_pasta('assets/img/brasilia') ?: ['assets/img/header-bg.png'];
+        $slides = imagens_da_pasta('assets/img/brasilia') ?: ['assets/img/header-bg.jpg'];
 
         $title = 'Início';
         $layoutLargo = true;

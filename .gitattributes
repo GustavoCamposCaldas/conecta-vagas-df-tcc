@@ -1,0 +1,6 @@
+# Scripts de shell (gancho do git) precisam de LF; .bat do Windows, de CRLF.
+.githooks/* text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+# Leitor de cartaz (Tesseract.js): arquivos de terceiros, entregues byte a byte como vieram.
+public/assets/js/vendor/tesseract/** -text -diff

@@ -7,3 +7,5 @@ storage/logs/*
 .env
 .DS_Store
 Thumbs.db
+storage/backups/*
+.vscode/

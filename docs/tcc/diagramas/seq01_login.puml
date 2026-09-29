@@ -1,0 +1,30 @@
+@startuml
+!include estilo.iuml
+mainframe sd Realizar login
+autonumber "0:"
+hide footbox
+
+actor Usuario
+boundary ":TelaLogin" as T
+control ":AuthController" as C
+entity ":UsuarioDAO" as D
+Usuario -> T ++ : informar e-mail e senha
+T -> C ++ : login(email, senha)
+C -> C : validar_csrf()
+C -> D ++ : minutosBloqueioLogin(ip, email)
+D --> C -- : 0 (sem pausa)
+C -> D ++ : autenticar(email, senha)
+D --> C -- : dados do usuário
+alt senha confere
+  C -> D ++ : limparFalhasLogin(ip, email)
+  D --> C -- : ok
+  C -> C : iniciar_sessao_usuario()
+  C --> T : redirecionar ao painel
+else senha errada
+  C -> D ++ : registrarFalhaLogin(ip, email)
+  D --> C -- : ok
+  C --> T : "E-mail ou senha inválidos"
+end
+deactivate C
+T --> Usuario -- : exibir painel ou mensagem
+@enduml

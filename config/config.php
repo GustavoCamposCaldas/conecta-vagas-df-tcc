@@ -55,12 +55,26 @@ define('UPLOAD_DIR', ROOT_DIR.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.
 define('LOG_DIR', ROOT_DIR.DIRECTORY_SEPARATOR.'storage'.DIRECTORY_SEPARATOR.'logs'.DIRECTORY_SEPARATOR);
 
 // ------------------------------------------------------------
+// Doação (QR Code Pix do rodapé)
+// ------------------------------------------------------------
+// Imagem do QR Code de doação (rodapé e painel relâmpago). Para usar o seu QR real, gerado no app do
+// banco, substitua o arquivo public/assets/img/doacao/qrcode-pix.svg (ou aponte aqui para um .png/.jpg).
+// O arquivo que vem com o projeto é um QR FICTÍCIO, só para marcar o lugar.
+define('DOACAO_QR_IMAGEM', 'assets/img/doacao/qrcode-pix.svg');
+// Opcional: com a chave Pix aqui (CPF, CNPJ, e-mail, celular +5561999999999 ou chave aleatória), o site
+// gera o QR sozinho no lugar da imagem acima. Nome até 25 e cidade até 15 letras, sem acento.
+define('DOACAO_PIX_CHAVE', getenv('DOACAO_PIX_CHAVE') ?: '');
+define('DOACAO_NOME', getenv('DOACAO_NOME') ?: 'Conecta Vagas DF');
+define('DOACAO_CIDADE', getenv('DOACAO_CIDADE') ?: 'Brasilia');
+
+// ------------------------------------------------------------
 // Limites
 // ------------------------------------------------------------
 define('MAX_FILE_SIZE', 10 * 1024 * 1024);  // currículo: até 10 MB
 
 // Proteção do login contra tentativas repetidas (por IP + e-mail, por e-mail e por IP).
-define('LOGIN_MAX_TENTATIVAS', 5);       // erros seguidos para o mesmo e-mail, a partir do mesmo IP
-define('LOGIN_MAX_TENTATIVAS_CONTA', 10); // erros para o mesmo e-mail, somando todos os IPs (ataque distribuído)
-define('LOGIN_MAX_TENTATIVAS_IP', 30);   // erros de um mesmo IP, somando todos os e-mails
-define('LOGIN_JANELA_MINUTOS', 15);      // janela de contagem e tempo de bloqueio
+// Calibrado para não atrapalhar quem erra a senha algumas vezes, mas ainda barrar força-bruta.
+define('LOGIN_MAX_TENTATIVAS', 8);       // erros seguidos para o mesmo e-mail, a partir do mesmo IP
+define('LOGIN_MAX_TENTATIVAS_CONTA', 20); // erros para o mesmo e-mail, somando todos os IPs (ataque distribuído)
+define('LOGIN_MAX_TENTATIVAS_IP', 60);   // erros de um mesmo IP, somando todos os e-mails
+define('LOGIN_JANELA_MINUTOS', 5);       // janela de contagem e tempo da pausa

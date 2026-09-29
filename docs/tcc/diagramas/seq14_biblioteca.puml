@@ -1,0 +1,27 @@
+@startuml
+!include estilo.iuml
+mainframe sd Trazer os PDFs para a biblioteca
+autonumber "0:"
+hide footbox
+
+actor Administrador as A
+boundary ":TelaCursos" as T
+control ":AdminController" as C
+entity ":CursoDAO" as D
+control ":ImagemRemota" as R
+participant "Site oficial\ndo e-book" as W
+A -> T ++ : clicar em "Trazer os PDFs\npara a biblioteca"
+T -> C ++ : cursos(acao = pdfs_biblioteca)
+C -> D ++ : listar(false)
+D --> C -- : e-books com link da web
+C -> R ++ : pdfs(links)
+R -> R : linkPublico(link)
+R -> W ++ : baixar (HTTPS, até 150 MB)
+W --> R -- : PDF ou página do e-book
+R -> R : pdfDaPagina() / ehPdf() / guardarPdf()
+R --> C -- : link → biblioteca_*.pdf
+C -> D ++ : guardarNaBiblioteca(id, pdf, descrição com a fonte)
+D --> C -- : true
+C --> T -- : "N PDF(s) guardado(s) na biblioteca"
+T --> A -- : exibir mensagem (botão "Baixar")
+@enduml

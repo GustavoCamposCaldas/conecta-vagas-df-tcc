@@ -1,0 +1,16 @@
+@startuml
+!include estilo.iuml
+mainframe uc Acesso à conta
+left to right direction
+actor Visitante as V
+rectangle "Conecta Vagas DF" {
+  usecase "Cadastrar conta\n(candidato ou empresa)" as C
+  usecase "Aceitar termo LGPD" as T
+  usecase "Solicitar redefinição\nde senha" as S
+  usecase "Redefinir senha\n(link com token de uso único)" as R
+}
+V -- C
+V -- S
+V -- R
+C ..> T : <<include>>
+@enduml
